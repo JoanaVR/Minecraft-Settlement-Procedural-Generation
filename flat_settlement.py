@@ -53,7 +53,9 @@ def main():
 
     start_x = buildArea.offset.x
     start_z = buildArea.offset.z
-    ground_y = heightmap[3,1] -1
+    local_x = curr_x - buildArea.offset.x
+    local_z = start_z - buildArea.offset.z
+    ground_y = heightmap[local_x, local_z] - 1
     
     num_buildings = random.randint(8, 12)
     spacing = 12
