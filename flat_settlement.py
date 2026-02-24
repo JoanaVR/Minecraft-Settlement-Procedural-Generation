@@ -2,7 +2,7 @@ from gdpc import Editor, Block
 import random
 from gdpc.geometry import placeCuboid,placeCuboidHollow
 
-def build_robust_house(editor, x, y, z, depth, height, wall, floor):
+def build_robust_house(editor, x, y, z, depth, height, wall, floor, facing):
     """
     Builds a house with a foundation and proper floor alignment.
     y: the height of the ground block.
@@ -33,67 +33,139 @@ def build_robust_house(editor, x, y, z, depth, height, wall, floor):
     placeCuboid(editor, (x+2, yy, z-1), (x+2, yy, z+depth+1), floor)
     
     # 5. Door placement 
-    # Placed at house_base_y so it sits on the floor
-    editor.placeBlock((x+2, y+1, z), Block("oak_door", {"facing":"north", "hinge":"left"}))
-    placeCuboid(editor, (x+1, y+1, z-1), (x+3, y+3, z-1), Block("air"))
+    #place door and windows on the front wall (facing the road)
+    if facing == "north":
+        door_pos = (x+2, y+1, z)
+        window1 = (x+1, y+2, z+depth)
+        window2 = (x+3, y+2, z+depth)
+
+    elif facing == "south":
+        door_pos = (x+2, y+1, z+depth)
+        window1 = (x+1, y+2, z)
+        window2 = (x+3, y+2, z)
+
+    elif facing == "east":
+        door_pos = (x+4, y+1, z+depth//2)
+        window1 = (x, y+2, z+1)
+        window2 = (x, y+2, z+depth-1)
+
+    elif facing == "west":
+        door_pos = (x, y+1, z+depth//2)
+        window1 = (x+4, y+2, z+1)
+        window2 = (x+4, y+2, z+depth-1)
+
+    editor.placeBlock(door_pos, Block("oak_door", {"facing": facing}))
+    
+    # Clear space in front of door
+    dx, dz = 0, 0
+    if facing == "north": dz = -1
+    if facing == "south": dz = 1
+    if facing == "east": dx = 1
+    if facing == "west": dx = -1
+
+    editor.placeBlock((door_pos[0]+dx, door_pos[1], door_pos[2]+dz), Block("air"))
     
     # 6. Windows
-    editor.placeBlock((x + 1, y + 2, z), Block("glass_pane"))
-    editor.placeBlock((x - 2, y + 2, z), Block("glass_pane"))
+    editor.placeBlock(window1, Block("glass_pane"))
+    editor.placeBlock(window2, Block("glass_pane"))
 
-def main():
-    editor = Editor(buffering=True)
+
+def generate_road(editor, buildArea, length=100):
+    x = buildArea.offset.x + buildArea.size.x // 2
+    z = buildArea.offset.z + buildArea.size.z // 2
     
-    buildArea = editor.getBuildArea()
+    direction = (1, 0)
+    road_positions = []
 
-    #Load world slice
-    editor.loadWorldSlice(cache=True)
-    #Get heightmap
-    heightmap = editor.worldSlice.heightmaps["MOTION_BLOCKING_NO_LEAVES"]
+    for i in range(length):
+        road_positions.append((x, z))
+        
+        # Occasionally change direction slighly to have a more natural, winding road
+        if random.random() < 0.2:
+            direction = random.choice([(1,0), (-1,0), (0,1), (0,-1)])
+        
+        x += direction[0]
+        z += direction[1]
 
-    start_x = buildArea.offset.x
-    start_z = buildArea.offset.z
-    local_x = curr_x - buildArea.offset.x
-    local_z = start_z - buildArea.offset.z
-    ground_y = heightmap[local_x, local_z] - 1
+    return road_positions
+
+# def main():
+#     editor = Editor(buffering=True)
     
-    num_buildings = random.randint(8, 12)
-    spacing = 12
+#     buildArea = editor.getBuildArea()
 
-    #floor palette
-    floorpalette = [
-        Block("stone_bricks"),
-        Block("cracked_stone_bricks"),
-        Block("cobblestone")
-    ]
+#     #Load world slice
+#     editor.loadWorldSlice(cache=True)
+#     #Get heightmap
+#     heightmap = editor.worldSlice.heightmaps["MOTION_BLOCKING_NO_LEAVES"]
 
-    #wall palette
-    wallpalette = [
-        Block("oak_planks"),
-        Block("stripped_oak_wood"),
-        Block("stripped_birch_wood"),
-        Block("birch_planks")
-    ]
+#     x = buildArea.offset.x + buildArea.size.x // 2
+#     z = buildArea.offset.z + buildArea.size.z // 2
 
-    print(f"Generating robust settlement at Y: {ground_y}")
+#     road_positions = []
 
-    curr_x = start_x
+#     direction = (1, 0)
 
-    for i in range(num_buildings):
-        
-        # Randomize dimensions
-        h = random.randint(3,7)
-        d = random.randint(3,10)
-        wall = random.choice(wallpalette)
-        floor = random.choice(floorpalette)
-        
-        # Build!
-        build_robust_house(editor, curr_x, ground_y, start_z, d, h, wall, floor)
+#     # Generate road
+#     for i in range(80):
 
-        curr_x += spacing
-   
-    editor.flushBuffer()
-    print("Done! The doors should now be flush with the ground.")
+#         # Convert world coords to heightmap local coords
+#         local_x = x - buildArea.offset.x
+#         local_z = z - buildArea.offset.z
 
-if __name__ == "__main__":
-    main()
+#         # Stay inside build area
+#         if not (0 <= local_x < buildArea.size.x and 0 <= local_z < buildArea.size.z):
+#             break
+
+#         y = heightmap[local_x, local_z] - 1
+
+#         road_positions.append((x, y, z))
+
+#         # Place road block
+#         editor.placeBlock((x, y, z), Block("dirt_path"))
+
+#         # Occasionally turn
+#         if random.random() < 0.15:
+#             direction = random.choice([(1,0), (-1,0), (0,1), (0,-1)])
+
+#         x += direction[0]
+#         z += direction[1]
+
+#     # Place houses along road
+#     spacing = 12
+#     for i in range(0, len(road_positions), spacing):
+
+#         rx, ry, rz = road_positions[i]
+#         facing = None
+
+#         # Alternate left/right
+#         if i % 2 == 0:
+#             hx = rx + 6
+#             hz = rz
+#             facing = "east"
+#         else:
+#             hx = rx - 6
+#             hz = rz
+#             facing = "west"
+           
+#         # Recalculate ground height for house
+#         local_x = hx - buildArea.offset.x
+#         local_z = hz - buildArea.offset.z
+
+#         if 0 <= local_x < buildArea.size.x and 0 <= local_z < buildArea.size.z:
+#             hy = heightmap[local_x, local_z] - 1
+
+#             build_robust_house(
+#                 editor,
+#                 hx,
+#                 hy,
+#                 hz,
+#                 depth=random.randint(4,8),
+#                 height=random.randint(4,6),
+#                 wall=Block("oak_planks"),
+#                 floor=Block("stone_bricks"),
+#                 facing=facing
+#             )
+
+#     editor.flushBuffer()
+#     print("Village generated.")
