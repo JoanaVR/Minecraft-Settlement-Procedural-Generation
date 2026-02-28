@@ -33,7 +33,7 @@ def main():
     )
 
     editor.flushBuffer()
-    print("Village generated.")
+    print("Village generated at",x, y,z)
 
 if __name__ == "__main__":
     main()
