@@ -1,9 +1,78 @@
 import random
 import heapq
-from math import copysign
+import numpy as np
+from gdpc import Editor, Block
+from gdpc.geometry import placeCuboid
+import build_houses
+import math
 
-# def get_height(heightmap, x, z):
-#     return heightmap[(x, z)]
+
+# ─────────────────────────────────────────────
+#  Helpers
+# ─────────────────────────────────────────────
+
+def get_height(heightmap, x, z, origin):
+    ox, oz = origin
+    lx, lz = x - ox, z - oz
+    if 0 <= lx < heightmap.shape[0] and 0 <= lz < heightmap.shape[1]:
+        return int(heightmap[lx, lz])
+    return None
+
+
+def in_bounds(x, z, heightmap, origin):
+    ox, oz = origin
+    lx, lz = x - ox, z - oz
+    return 0 <= lx < heightmap.shape[0] and 0 <= lz < heightmap.shape[1]
+
+
+def is_water_ws(worldslice, x, z, origin):
+    """Check surface block for water using local WorldSlice data (no HTTP)."""
+    ox, oz = origin
+    lx, lz = x - ox, z - oz
+    sx, sz = worldslice.heightmaps["MOTION_BLOCKING_NO_LEAVES"].shape
+    if not (0 <= lx < sx and 0 <= lz < sz):
+        return False
+    y = int(worldslice.heightmaps["MOTION_BLOCKING_NO_LEAVES"][lx, lz])
+    # Check the block at and just below the surface
+    for dy in range(0, 3):
+        try:
+            block = worldslice.getBlock((lx, y - dy, lz))
+            if block.id in ("minecraft:water", "minecraft:flowing_water",
+                            "minecraft:seagrass", "minecraft:tall_seagrass",
+                            "minecraft:kelp", "minecraft:kelp_plant"):
+                return True
+        except Exception:
+            pass
+    return False
+
+
+def slope_in_area(heightmap, origin, x, z, width=5, depth=5):
+    """Return max height difference within a rectangular footprint."""
+    heights = []
+    for dx in range(width):
+        for dz in range(depth):
+            h = get_height(heightmap, x + dx, z + dz, origin)
+            if h is not None:
+                heights.append(h)
+    if not heights:
+        return 999
+    return max(heights) - min(heights)
+
+
+def is_valid_house_site(worldslice, heightmap, origin, x, z,
+                         width=5, depth=5, max_slope=2):
+    if slope_in_area(heightmap, origin, x, z, width, depth) > max_slope:
+        return False
+    for dx in range(0, width, 2):
+        for dz in range(0, depth, 2):
+            if is_water_ws(worldslice, x + dx, z + dz, origin):
+                return False
+    return True
+
+
+# ─────────────────────────────────────────────
+#  A* path-finder
+# ─────────────────────────────────────────────
 
 class Node:
     def __init__(self, pos, g=0, h=0, parent=None):
@@ -16,54 +85,29 @@ class Node:
     def __lt__(self, other):
         return self.f < other.f
 
+
 def heuristic(a, b):
-    return abs(a[0]-b[0]) + abs(a[1]-b[1])
+    return abs(a[0] - b[0]) + abs(a[1] - b[1])
 
 
-def terrain_cost(heightmap, a, b):
-
-    h1 = heightmap[a]
-    h2 = heightmap[b]
-
-    height_diff = abs(h1 - h2)
-
-    # punish steep slopes
-    return 1 + height_diff * 3
-
-def astar(start, goal, heightmap, origin):
-
+def astar(start, goal, heightmap, origin, worldslice=None, water_penalty=50):
     ox, oz = origin
-
-    size_x, size_z = heightmap.shape
-
+    sx, sz = heightmap.shape
     open_list = []
     closed = set()
-
-    heapq.heappush(
-        open_list,
-        Node(start, 0, heuristic(start, goal))
-    )
-
-    directions = [(1,0),(-1,0),(0,1),(0,-1)]
+    heapq.heappush(open_list, Node(start, 0, heuristic(start, goal)))
+    directions = [(1, 0), (-1, 0), (0, 1), (0, -1)]
 
     def valid(pos):
-        lx = pos[0] - ox
-        lz = pos[1] - oz
-
-        return (
-            0 <= lx < size_x and
-            0 <= lz < size_z
-        )
+        lx, lz = pos[0] - ox, pos[1] - oz
+        return 0 <= lx < sx and 0 <= lz < sz
 
     def height(pos):
-        lx = pos[0] - ox
-        lz = pos[1] - oz
-        return heightmap[lx, lz]
+        lx, lz = pos[0] - ox, pos[1] - oz
+        return int(heightmap[lx, lz])
 
     while open_list:
-
         current = heapq.heappop(open_list)
-
         if current.pos == goal:
             path = []
             while current:
@@ -72,293 +116,213 @@ def astar(start, goal, heightmap, origin):
             return path[::-1]
 
         closed.add(current.pos)
-
         for dx, dz in directions:
-
-            nxt = (
-                current.pos[0] + dx,
-                current.pos[1] + dz
-            )
-
-            if not valid(nxt):
-                continue
-
-            if nxt in closed:
+            nxt = (current.pos[0] + dx, current.pos[1] + dz)
+            if not valid(nxt) or nxt in closed:
                 continue
 
             h1 = height(current.pos)
             h2 = height(nxt)
+            slope_cost = abs(h1 - h2) * 4
 
-            cost = 1 + abs(h1 - h2) * 3
+            water_cost = 0
+            if worldslice is not None and is_water_ws(worldslice, nxt[0], nxt[1], origin):
+                water_cost = water_penalty
 
-            node = Node(
-                nxt,
-                current.g + cost,
-                heuristic(nxt, goal),
-                current
-            )
-
-            heapq.heappush(open_list, node)
-
+            cost = 1 + slope_cost + water_cost
+            heapq.heappush(open_list, Node(nxt, current.g + cost,
+                                           heuristic(nxt, goal), current))
     return []
 
 
-def far_enough(pos, houses, min_dist=7):
-    for hx, _, hz, _ in houses:
-        if abs(pos[0]-hx) + abs(pos[1]-hz) < min_dist:
-            return False
-    return True
+# ─────────────────────────────────────────────
+#  Footprint / collision tracking
+# ─────────────────────────────────────────────
 
-def facing_from_offset(dx, dz):
-
-    if dx == 1:
-        return "west"
-    elif dx == -1:
-        return "east"
-    elif dz == 1:
-        return "north"
-    elif dz == -1:
-        return "south"
-
-    return "north"   # safe fallback
+def footprint(hx, hz, width=5, depth=5, padding=2):
+    """Return all (x,z) cells occupied by a house + padding."""
+    cells = set()
+    for dx in range(-padding, width + padding):
+        for dz in range(-padding, depth + padding):
+            cells.add((hx + dx, hz + dz))
+    return cells
 
 
-def place_houses_along_path(path, heightmap, origin):
+def overlaps_any(hx, hz, placed_footprints, width=5, depth=5, padding=2):
+    fp = footprint(hx, hz, width, depth, padding)
+    for existing in placed_footprints:
+        if fp & existing:
+            return True
+    return False
 
-    ox, oz = origin
-    sx, sz = heightmap.shape
 
-    def valid(x,z):
-        lx = x - ox
-        lz = z - oz
-        return 0 <= lx < sx and 0 <= lz < sz
+# ─────────────────────────────────────────────
+#  House placement – radial scatter
+# ─────────────────────────────────────────────
 
-    def height(x,z):
-        return heightmap[x-ox, z-oz]
+def facing_toward(hx, hz, cx, cz):
+    """Return the facing that points the door toward the village centre."""
+    dx, dz = cx - hx, cz - hz
+    if abs(dx) >= abs(dz):
+        return "east" if dx > 0 else "west"
+    return "south" if dz > 0 else "north"
 
+
+def place_houses_radial(worldslice, heightmap, origin, center, num_houses=10,
+                         min_radius=10, max_radius=30, max_attempts=200):
+    cx, cz = center
+    placed_footprints = []
     houses = []
+    attempts = 0
 
-    offsets = [
-        (2,0), (-2,0),
-        (0,2), (0,-2)
-    ]
+    while len(houses) < num_houses and attempts < max_attempts:
+        attempts += 1
+        angle = random.uniform(0, 2 * math.pi)
+        radius = random.uniform(min_radius, max_radius)
+        hx = int(cx + radius * math.cos(angle))
+        hz = int(cz + radius * math.sin(angle))
 
-    for i in range(5, len(path), 6):
+        if not in_bounds(hx, hz, heightmap, origin):
+            continue
+        if not in_bounds(hx + 4, hz + 4, heightmap, origin):
+            continue
+        if not is_valid_house_site(worldslice, heightmap, origin, hx, hz):
+            continue
+        if overlaps_any(hx, hz, placed_footprints):
+            continue
 
-        px, pz = path[i]
-
-        random.shuffle(offsets)
-
-        for dx, dz in offsets:
-
-            hx = px + dx
-            hz = pz + dz
-
-            if not valid(hx, hz):
-                continue
-
-            if not far_enough((hx, hz), houses):
-                continue
-
-            facing = facing_from_offset(dx, dz)
-            hy = height(hx, hz)
-
-            houses.append((hx, hy, hz, facing))
-            break
+        hy = get_height(heightmap, hx, hz, origin)
+        facing = facing_toward(hx, hz, cx, cz)
+        houses.append((hx, hy, hz, facing))
+        placed_footprints.append(footprint(hx, hz))
 
     return houses
 
-def generate_village_layout(start, goal, heightmap, origin):
 
-    path = astar(start, goal, heightmap, origin)
+# ─────────────────────────────────────────────
+#  Farm placement
+# ─────────────────────────────────────────────
 
-    houses = place_houses_along_path(
-        path,
-        heightmap,
-        origin
-    )
-
-    return path, houses
-
-# def generate_village_layout(buildArea, heightmap, road_length=80):
-
-
-#     road_positions = []
-#     house_plots = []
-#     occupied = []
-
-#     # Start near center
-#     x = buildArea.offset.x + buildArea.size.x // 2
-#     z = buildArea.offset.z + buildArea.size.z // 2
-
-#     direction = (1, 0)  # start east
-#     ROAD_WIDTH = 3
-#     HOUSE_OFFSET = 8
-#     MIN_SPACING = 12
-
-#     last_house_step = 0
-
-#     for step in range(road_length):
-
-#         local_x = x - buildArea.offset.x
-#         local_z = z - buildArea.offset.z
-
-#         if not (0 <= local_x < buildArea.size.x and 0 <= local_z < buildArea.size.z):
-#             break
-
-#         y = heightmap[local_x, local_z] - 1
-#         road_positions.append((x, y, z))
-
-#         # === Controlled slight turns (natural feel) ===
-#         if random.random() < 0.12:
-#             if direction[0] != 0:
-#                 direction = (0, int(copysign(1, random.choice([-1, 1]))))
-#             else:
-#                 direction = (int(copysign(1, random.choice([-1, 1]))), 0)
-
-#         # === House placement spacing control ===
-#         if step - last_house_step > MIN_SPACING:
-
-#             for side in [-1, 1]:  # left & right
-
-#                 depth = random.randint(5, 8)
-#                 width = 4
-#                 height = random.randint(4, 6)
-
-#                 # Perpendicular offset from road
-#                 if direction[0] != 0:
-#                     hx = x
-#                     hz = z + side * HOUSE_OFFSET
-#                     facing = "north" if side > 0 else "south"
-#                 else:
-#                     hx = x + side * HOUSE_OFFSET
-#                     hz = z
-#                     facing = "west" if side > 0 else "east"
-
-#                 x1 = hx
-#                 z1 = hz
-#                 x2 = hx + width
-#                 z2 = hz + depth
-
-#                 # Overlap check
-#                 overlap = False
-#                 for ox1, oz1, ox2, oz2 in occupied:
-#                     if not (x2 < ox1 or x1 > ox2 or z2 < oz1 or z1 > oz2):
-#                         overlap = True
-#                         break
-
-#                 if not overlap:
-#                     local_x = hx - buildArea.offset.x
-#                     local_z = hz - buildArea.offset.z
-
-#                     if 0 <= local_x < buildArea.size.x and 0 <= local_z < buildArea.size.z:
-#                         hy = heightmap[local_x, local_z] - 1
-
-#                         house_plots.append({
-#                             "x": hx,
-#                             "y": hy,
-#                             "z": hz,
-#                             "depth": depth,
-#                             "height": height,
-#                             "facing": facing
-#                         })
-
-#                         occupied.append((x1, z1, x2, z2))
-
-#                         last_house_step = step
-
-#         x += direction[0]
-#         z += direction[1]
-
-#     return road_positions, house_plots
-
-
-# import heapq
-
-# def astar_path(buildArea, heightmap, start, goal):
-#     """Terrain-aware A* returning list of (x, y, z)"""
-#     def heuristic(a, b):
-#         return abs(a[0]-b[0]) + abs(a[1]-b[1])
-
-#     def neighbors(pos):
-#         x, z = pos
-#         for dx, dz in [(-1,0),(1,0),(0,-1),(0,1)]:
-#             nx, nz = x+dx, z+dz
-#             if 0 <= nx - buildArea.offset.x < buildArea.size.x and 0 <= nz - buildArea.offset.z < buildArea.size.z:
-#                 yield (nx, nz)
-
-#     start_node = start
-#     goal_node = goal
-#     open_set = []
-#     heapq.heappush(open_set, (0, start_node))
-#     came_from = {}
-#     g_score = {start_node: 0}
-
-#     while open_set:
-#         current_f, current = heapq.heappop(open_set)
-#         if current == goal_node:
-#             # reconstruct path
-#             path = []
-#             node = current
-#             while node in came_from:
-#                 x, z = node
-#                 y = heightmap[x - buildArea.offset.x, z - buildArea.offset.z]
-#                 path.append((x, y, z))
-#                 node = came_from[node]
-#             x, z = start_node
-#             path.append((x, heightmap[x - buildArea.offset.x, z - buildArea.offset.z], z))
-#             return path[::-1]
+def find_farm_site(worldslice, heightmap, origin, center, placed_footprints,
+                   farm_w=9, farm_d=9, max_attempts=300, max_slope=2):
+    import math
+    ox, oz = origin
+    sx, sz = heightmap.shape
+    
+    for _ in range(max_attempts):
+        # Pick anywhere in the build area randomly
+        fx = ox + random.randint(0, sx - farm_w - 1)
+        fz = oz + random.randint(0, sz - farm_d - 1)
         
-#         for neighbor in neighbors(current):
-#             nx, nz = neighbor
-#             x_cur, z_cur = current
-#             y_cur = heightmap[x_cur - buildArea.offset.x, z_cur - buildArea.offset.z]
-#             y_next = heightmap[nx - buildArea.offset.x, nz - buildArea.offset.z]
-#             cost = 1 + abs(y_next - y_cur)
-#             tentative_g = g_score[current] + cost
-#             if neighbor not in g_score or tentative_g < g_score[neighbor]:
-#                 came_from[neighbor] = current
-#                 g_score[neighbor] = tentative_g
-#                 f_score = tentative_g + heuristic(neighbor, goal_node)
-#                 heapq.heappush(open_set, (f_score, neighbor))
-#     return []
+        if not in_bounds(fx + farm_w, fz + farm_d, heightmap, origin):
+            continue
+        if not is_valid_house_site(worldslice, heightmap, origin, fx, fz,
+                                   width=farm_w, depth=farm_d, max_slope=max_slope):
+            continue
+        if overlaps_any(fx, fz, placed_footprints, width=farm_w, depth=farm_d, padding=2):
+            continue
+        
+        fy = get_height(heightmap, fx, fz, origin)
+        if fy is None:
+            continue
+        return fx, int(fy), fz
+    
+    print("WARNING: Could not place farm")
+    return None
 
-# def connect_all_houses(buildArea, heightmap, house_plots):
-#     """
-#     Connects all houses with A* roads.
-#     house_plots: list of dicts with 'x', 'z' (and 'y' optional)
-#     Returns: list of all (x, y, z) road positions
-#     """
-#     road_positions = []
-#     if not house_plots:
-#         return road_positions
+# ─────────────────────────────────────────────
+#  Path network
+# ─────────────────────────────────────────────
 
-#     # Choose first house as hub
-#     hub = house_plots[0]
-#     hub_pos = (hub['x'], hub['z'])
+def build_path_network(center, houses, heightmap, origin, worldslice):
+    road_tiles = set()
+    cx, cz = center
+    for hx, hy, hz, facing in houses:
+        path = astar((hx, hz), (cx, cz), heightmap, origin, worldslice)
+        for tile in path:
+            road_tiles.add(tile)
+    return road_tiles
 
-#     connected = {0}
-#     to_connect = set(range(1, len(house_plots)))
 
-#     while to_connect:
-#         best_pair = None
-#         best_dist = float('inf')
-#         # Find closest unconnected house
-#         for idx in to_connect:
-#             house = house_plots[idx]
-#             house_pos = (house['x'], house['z'])
-#             dist = abs(hub_pos[0] - house_pos[0]) + abs(hub_pos[1] - house_pos[1])
-#             if dist < best_dist:
-#                 best_dist = dist
-#                 best_pair = (hub_pos, house_pos, idx)
-#         # Generate A* path
-#         start, goal, idx = best_pair
-#         path = astar_path(buildArea, heightmap, start, goal)
-#         road_positions.extend(path)
-#         # Mark as connected
-#         connected.add(idx)
-#         to_connect.remove(idx)
-#         # Optionally: next hub can be this house for branching
-#         hub_pos = goal
+# ─────────────────────────────────────────────
+#  Road surface placement
+# ─────────────────────────────────────────────
 
-#     return road_positions
+def place_road(editor, heightmap, origin, road_tiles):
+    """Replace surface blocks on road tiles with gravel/stone path."""
+    for (x, z) in road_tiles:
+        y = get_height(heightmap, x, z, origin)
+        if y is None:
+            continue
+        editor.placeBlock((x, y-1, z), Block("dirt_path"))
+        # editor.placeBlock((x, y, z), Block("gravel"))
+        # editor.placeBlock((x, y - 1, z), Block("stone"))
+
+
+# ─────────────────────────────────────────────
+#  Master generate function
+# ─────────────────────────────────────────────
+
+def generate_village(editor, buildArea, heightmap, worldslice, num_houses=10, num_farms=1):
+    origin = (buildArea.offset.x, buildArea.offset.z)
+    ox, oz = origin
+    sx, sz = heightmap.shape
+    # 1. Village centre
+    center = None
+    for _ in range(100):
+        cx = ox + random.randint(sx // 4, 3 * sx // 4)
+        cz = oz + random.randint(sz // 4, 3 * sz // 4)
+        if is_valid_house_site(worldslice, heightmap, origin, cx, cz, max_slope=2):
+            center = (cx, cz)
+            break
+    if center is None:
+        center = (ox + sx // 2, oz + sz // 2)
+    print(f"Village centre: {center}")
+    # 2. Houses
+    houses = place_houses_radial(worldslice, heightmap, origin, center,
+                                  num_houses=num_houses)
+    print(f"Placed {len(houses)} houses")
+
+    # 3. Build footprints list from placed houses          ← ADD THIS
+    placed_footprints = [footprint(hx, hz) for hx, hy, hz, facing in houses]
+
+
+    # 4. Farms - guarantee at least one
+    farms = []
+    for _ in range(num_farms):
+        # First try with strict settings
+        site = find_farm_site(worldslice, heightmap, origin, center, placed_footprints)
+        
+        # If that fails, retry with very relaxed settings
+        if site is None:
+            print("Farm placement failed with strict settings, retrying relaxed...")
+            site = find_farm_site(worldslice, heightmap, origin, center, 
+                                placed_footprints, min_r=3, max_r=40, 
+                                max_slope=3, max_attempts=300)
+    
+    if site:
+        farms.append(site)
+        fx, fy, fz = site
+        placed_footprints.append(footprint(fx, fz, width=9, depth=9))
+    else:
+        print("WARNING: Could not place farm after retrying")
+
+    # 5. Paths
+    road_tiles = build_path_network(center, houses, heightmap, origin, worldslice)
+    for fx, fy, fz in farms:
+        path = astar((fx, fz), center, heightmap, origin, worldslice)
+        for tile in path:
+            road_tiles.add(tile)
+    # 6. Build
+    place_road(editor, heightmap, origin, road_tiles)
+    for hx, hy, hz, facing in houses:
+        wall = Block("oak_planks")
+        floor = Block("oak_planks")
+        depth = random.choice([4, 5, 6])
+        if random.random() < 0.4:
+            build_houses.build_2fhouse(editor, hx, hy, hz, depth, 4, wall, floor, facing)
+        else:
+            build_houses.build_1fhouse(editor, hx, hy, hz, depth, 4, wall, floor, facing)
+    for fx, fy, fz in farms:
+        build_houses.build_farm(editor, fx, fy, fz, width=9, depth=9)
+    print("Village generation complete.")

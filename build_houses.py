@@ -137,23 +137,3 @@ def build_farm(editor, x, y, z, width, depth):
             if j != water_z - z: 
                 crop = random.choice(crops)
                 editor.placeBlock((x+i, y+1, z+j), Block(crop))
-
-
-def generate_road(editor, buildArea, length=100):
-    x = buildArea.offset.x + buildArea.size.x // 2
-    z = buildArea.offset.z + buildArea.size.z // 2
-    
-    direction = (1, 0)
-    road_positions = []
-
-    for i in range(length):
-        road_positions.append((x, z))
-        
-        # Occasionally change direction slighly to have a more natural, winding road
-        if random.random() < 0.2:
-            direction = random.choice([(1,0), (-1,0), (0,1), (0,-1)])
-        
-        x += direction[0]
-        z += direction[1]
-
-    return road_positions
