@@ -103,7 +103,7 @@ def build_1fhouse(editor, x, y, z, depth, height, wall, floor, facing):
     placeCuboid(editor, (x+1, y+1, z+1), (x+3, y+height-1, z+3), Block("air"))
 
     roof_placement(editor,x,y,z,height,depth,floor)
-    doorplacement(x,y,z,depth,facing)
+    doorplacement(editor,x,y,z,depth,facing)
     
 #Builds a 2 floor house
 def build_2fhouse(editor, x,y,z,depth,height,wall,floor,facing):
@@ -116,6 +116,27 @@ def build_2fhouse(editor, x,y,z,depth,height,wall,floor,facing):
     place_stairs(editor, x, y, z, depth, middle_y, floor, facing)
     roof_placement(editor,x,y,z,height,depth,floor)
     doorplacement(editor, x,y,z,depth,facing)
+
+#Builds a farm for the villagers
+def build_farm(editor, x, y, z, width, depth):
+    for i in range(width):
+        for j in range(depth):
+            if i == 0 or i == width-1 or j == 0 or j == depth-1:
+                editor.placeBlock((x+i, y, z+j), Block("stone"))
+    for i in range(1, width-1):
+        for j in range(1, depth-1):
+            editor.placeBlock((x+i, y, z+j), Block("farmland"))
+    water_z = z + depth // 2
+    for i in range(1, width-1):
+        editor.placeBlock((x+i, y, water_z), Block("water"))
+
+  # plants the crops 
+    crops = ["wheat[age=0]", "carrots[age=0]", "potatoes[age=0]", "beetroots[age=0]"]
+    for i in range(1, width-1):
+        for j in range(1, depth-1):
+            if j != water_z - z: 
+                crop = random.choice(crops)
+                editor.placeBlock((x+i, y+1, z+j), Block(crop))
 
 
 def generate_road(editor, buildArea, length=100):
