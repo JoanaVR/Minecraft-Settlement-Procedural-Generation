@@ -7,10 +7,8 @@ import build_houses
 import math
 
 
-# ─────────────────────────────────────────────
-#  Helpers
-# ─────────────────────────────────────────────
 
+#helper functions
 def get_height(heightmap, x, z, origin):
     ox, oz = origin
     lx, lz = x - ox, z - oz
@@ -70,10 +68,8 @@ def is_valid_house_site(worldslice, heightmap, origin, x, z,
     return True
 
 
-# ─────────────────────────────────────────────
-#  A* path-finder
-# ─────────────────────────────────────────────
 
+#A* pathfinding implementation using A* algorithm
 class Node:
     def __init__(self, pos, g=0, h=0, parent=None):
         self.pos = pos
@@ -135,9 +131,7 @@ def astar(start, goal, heightmap, origin, worldslice=None, water_penalty=50):
     return []
 
 
-# ─────────────────────────────────────────────
-#  Footprint / collision tracking
-# ─────────────────────────────────────────────
+# footprint and overlap checking for house placement
 
 def footprint(hx, hz, width=5, depth=5, padding=2):
     """Return all (x,z) cells occupied by a house + padding."""
@@ -156,9 +150,7 @@ def overlaps_any(hx, hz, placed_footprints, width=5, depth=5, padding=2):
     return False
 
 
-# ─────────────────────────────────────────────
-#  House placement – radial scatter
-# ─────────────────────────────────────────────
+#house plesement and roof placement functions from build_houses.py
 
 def facing_toward(hx, hz, cx, cz):
     """Return the facing that points the door toward the village centre."""
@@ -198,11 +190,7 @@ def place_houses_radial(worldslice, heightmap, origin, center, num_houses=10,
 
     return houses
 
-
-# ─────────────────────────────────────────────
-#  Farm placement
-# ─────────────────────────────────────────────
-
+#farm placement with similar checks to house placement, but larger footprint and no need for facing
 def find_farm_site(worldslice, heightmap, origin, center, placed_footprints,
                    farm_w=9, farm_d=9, max_attempts=300, max_slope=2):
     import math
@@ -230,10 +218,7 @@ def find_farm_site(worldslice, heightmap, origin, center, placed_footprints,
     print("WARNING: Could not place farm")
     return None
 
-# ─────────────────────────────────────────────
-#  Path network
-# ─────────────────────────────────────────────
-
+#path network contruction 
 def build_path_network(center, houses, heightmap, origin, worldslice):
     road_tiles = set()
     cx, cz = center
@@ -244,9 +229,7 @@ def build_path_network(center, houses, heightmap, origin, worldslice):
     return road_tiles
 
 
-# ─────────────────────────────────────────────
-#  Road surface placement
-# ─────────────────────────────────────────────
+#road surface placement 
 
 def place_road(editor, heightmap, origin, road_tiles):
     """Replace surface blocks on road tiles with gravel/stone path."""
@@ -259,10 +242,7 @@ def place_road(editor, heightmap, origin, road_tiles):
         # editor.placeBlock((x, y - 1, z), Block("stone"))
 
 
-# ─────────────────────────────────────────────
-#  Master generate function
-# ─────────────────────────────────────────────
-
+#generation funciton
 def generate_village(editor, buildArea, heightmap, worldslice, num_houses=10, num_farms=1):
     origin = (buildArea.offset.x, buildArea.offset.z)
     ox, oz = origin
@@ -290,22 +270,13 @@ def generate_village(editor, buildArea, heightmap, worldslice, num_houses=10, nu
     # 4. Farms - guarantee at least one
     farms = []
     for _ in range(num_farms):
-        # First try with strict settings
         site = find_farm_site(worldslice, heightmap, origin, center, placed_footprints)
-        
-        # If that fails, retry with very relaxed settings
-        if site is None:
-            print("Farm placement failed with strict settings, retrying relaxed...")
-            site = find_farm_site(worldslice, heightmap, origin, center, 
-                                placed_footprints, min_r=3, max_r=40, 
-                                max_slope=3, max_attempts=300)
-    
-    if site:
-        farms.append(site)
-        fx, fy, fz = site
-        placed_footprints.append(footprint(fx, fz, width=9, depth=9))
-    else:
-        print("WARNING: Could not place farm after retrying")
+        if site:
+            farms.append(site)
+            fx, fy, fz = site
+            placed_footprints.append(footprint(fx, fz, width=9, depth=9))
+        else:
+            print("WARNING: Could not place farm")
 
     # 5. Paths
     road_tiles = build_path_network(center, houses, heightmap, origin, worldslice)
