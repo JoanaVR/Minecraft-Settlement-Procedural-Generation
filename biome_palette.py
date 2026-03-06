@@ -1,66 +1,52 @@
-block_palettes={
-    "Plains":{
-        "walls": ["Oak_Planks", "oak_logs", "cobblestone"],
-        "floor": ["grass"],
-        "roof": ["cobblestone", "oak_wood"]},
+import random
 
-    "Woodlands":{
-        "walls": ["dark_oak_planks","dark_oak_logs", "cobblestone"],
-        "floor": ["Birch_wood_planks"],
-        "roof": ["dark_oak_planks", "dark_oak_stairs", "cobblestone_stairs"]},
-
-    "Caves":{
-        "walls": ["stone", "deepslate", "gravel"],
-        "floor": ["stone", "deepslate", "moss_blocks"],
-        "roof": ["sculk_blocks", "deepslate", "stone", "moss_blocks", "cave_vines"]},
-
-    "Mountains":{
-        "walls" : ["stone", "deepslate", "spruce_logs", "granite", "snow_blocks"],
-        "floor": ["stone", "gravel", "snow", "calcite"],
-        "roof": ["snow", "dark_oakwood_slabs", "spruce_wood_stairs"]},
-
-    "Swamps":{
-        "walls": ["mud_bricks", "magrove_planks"],
-        "floor": ["mud", "muddy_mangrove_roots", "moss_carpet", "grass_blocks", "clay", "water"],
-        "roof": ["mangrove_planks", "mangrove_stairs", "mud_bricks", "dark_oak_planks"]},
-
-    "Sandy Areas":{
-        "walls": ["sandstone", "terracotta", "Concrete"],
-        "floor": ["sand", "red_sand", "sandstone", "soul_sand"],
-        "roof": ["sandstoneTerracottaMud_Bricks", "sandstone_stairs", "terracotta", "mud_brick_stairs"]},
-
-    "Water Areas":{
-        "walls": ["sand", "gravel", "dirt", "stone_bricks", "prismarine", "dark_prismarine"],
-        "floor": ["gravelsandclay", "dirt"],
-        "roof": ["prismarine", "stone_bricks", "sandstone"]},
-
-    "The Nether Biomes":{
-        "walls": ["netherrack", "basalt", "blackstone", "nether_bricks"],
-        "floor": ["nether_wastes", "crimson_forest", "warped_forest"],
-        "roof": ["bedrock", "nether_ceiling"]},
-
-    "The End Biomes":{
-        "walls": ["purpur_blocks", "purpur_pillars", "end_stone_bricks"],
-        "floor": ["end_stone", "obsidian"],
-        "roof":["end_stone_bricks", "obsidian", "purpur_stairs"]}
+block_palettes = {
+    "Plains": {
+        "walls": ["oak_planks", "birch_planks"],
+        "pillars": ["oak_log"],
+        "floor": ["cobblestone", "oak_planks"],
+        "roof": ["oak_stairs", "cobblestone_stairs"]
+    },
+    "Woodlands": {
+        "walls": ["dark_oak_planks", "spruce_planks"],
+        "pillars": ["dark_oak_log", "spruce_log"],
+        "floor": ["birch_planks", "cobblestone"],
+        "roof": ["dark_oak_stairs", "spruce_stairs"]
+    },
+    "Caves": {
+        "walls": ["stone", "deepslate", "cobblestone"],
+        "pillars": ["polished_deepslate", "stone_bricks"],
+        "floor": ["moss_block", "gravel"],
+        "roof": ["deepslate_brick_stairs", "stone_brick_stairs"]
+    },
+    "Mountains": {
+        "walls": ["spruce_planks", "stone"],
+        "pillars": ["spruce_log", "stone_bricks"],
+        "floor": ["calcite", "gravel"],
+        "roof": ["spruce_stairs", "dark_oak_stairs"]
+    },
+    "Sandy Areas": {
+        "walls": ["smooth_sandstone", "terracotta"],
+        "pillars": ["cut_sandstone", "chiseled_sandstone"],
+        "floor": ["sandstone", "birch_planks"],
+        "roof": ["sandstone_stairs", "smooth_sandstone_stairs"]
+    }
 }
 
-##add windows, doors
-import random
-def biome_palette(biome):
+def get_biome_palette(biome="Plains"):
     if biome in block_palettes:
         palette = block_palettes[biome]
     else:
-        palette= block_palettes["Plains"]
+        palette = block_palettes["Plains"]
 
-    palette_selection={
+    palette_selection = {
         "walls": random.choice(palette["walls"]),
+        "pillars": random.choice(palette["pillars"]),
         "floor": random.choice(palette["floor"]),
         "roof": random.choice(palette["roof"])
     }
     return palette_selection
-    
-print(biome_palette("Plains"))
-print(biome_palette("Caves"))
-print(biome_palette("Mountains"))
-print(biome_palette("Unknown"))
+
+if __name__ == "__main__":
+    print(get_biome_palette("Plains"))
+    print(get_biome_palette("Mountains"))
