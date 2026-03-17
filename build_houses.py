@@ -36,9 +36,9 @@ def doorplacement(editor, x, y, z, depth, facing, palette):
         door_pos = (x, y+1, z+depth//2)
         dx = -1
 
-
-    editor.placeBlock(door_pos, Block("oak_door", {"facing": facing, "half": "lower"}))
-    editor.placeBlock((door_pos[0], door_pos[1]+1, door_pos[2]), Block("oak_door", {"facing": facing, "half": "upper"}))
+    wood_type = palette["walls"].replace("_planks","")
+    editor.placeBlock(door_pos, Block(f"{wood_type}_door", {"facing": facing, "half": "lower"}))
+    editor.placeBlock((door_pos[0], door_pos[1]+1, door_pos[2]), Block(f"{wood_type}_door", {"facing": facing, "half": "upper"}))
     
     ox, oz = outside_pos
     step_block = palette["roof"]
@@ -70,11 +70,13 @@ def place_windows(editor, x, y, z, depth, facing):
         if facing == "west" and wx == x: continue
         editor.placeBlock((wx, wy, wz), Block("glass_pane"))
 
-def place_stairs(editor, x, y, z, depth, middle_y, floor_block, facing):
+def place_stairs(editor, x, y, z, depth, middle_y, floor_block, facing, palette):
     """Places stairs for a 2-story house with guaranteed head clearance."""
     stair_x = x + 1 
     stair_z = z + 1
     stair_facing = "south"
+
+    stair_block = palette["roof"]
     
     stair_height = middle_y - y
     steps = min(depth - 2, stair_height)
@@ -82,7 +84,7 @@ def place_stairs(editor, x, y, z, depth, middle_y, floor_block, facing):
     for i in range(steps):
 
         editor.placeBlock((stair_x, y + i, stair_z + i), floor_block)  
-        editor.placeBlock((stair_x, y + i + 1, stair_z + i), Block("oak_stairs", {"facing": stair_facing}))
+        editor.placeBlock((stair_x, y + i + 1, stair_z + i), Block(stair_block, {"facing": stair_facing}))
         
 
         editor.placeBlock((stair_x, middle_y, stair_z + i), Block("air"))
@@ -174,18 +176,19 @@ def build_2fhouse(editor, x, y, z, depth, palette, facing):
     placeCuboid(editor, (x+1, middle_y, z+1), (x+3, middle_y, z+depth-1), floor)
     
     add_pillars(editor, x, y, z, depth, height, pillar)
-    place_stairs(editor, x, y, z, depth, middle_y, floor, facing)
+    place_stairs(editor, x, y, z, depth, middle_y, floor, facing, palette)
     roof_placement(editor, x, y, z, height, depth, palette, facing)
     doorplacement(editor, x, y, z, depth, facing, palette)
     place_windows(editor, x, y, z, depth, facing)
     # 2nd floor windows
     place_windows(editor, x, y+4, z, depth, facing)
 
-def build_farm(editor, x, y, z, width, depth):
+def build_farm(editor, x, y, z, width, depth, palette):
+    log_block = palette["pillars"]
     for i in range(width):
         for j in range(depth):
             if i == 0 or i == width-1 or j == 0 or j == depth-1:
-                editor.placeBlock((x+i, y, z+j), Block("oak_log"))
+                editor.placeBlock((x+i, y, z+j), Block(log_block))
     for i in range(1, width-1):
         for j in range(1, depth-1):
             editor.placeBlock((x+i, y, z+j), Block("farmland"))

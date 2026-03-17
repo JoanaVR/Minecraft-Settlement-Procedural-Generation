@@ -3,7 +3,7 @@ import heapq
 import math
 import numpy as np
 from gdpc import Block
-from biome_palette import get_biome_palette
+from biome_palette import get_palette
 import build_houses
 
 # ─────────────────────────────────────────────
@@ -320,7 +320,7 @@ def generate_village(editor, buildArea, heightmap, worldslice, num_houses=10, nu
     if cy is not None: build_well(editor, cx, cy, cz)
 
     # 5. Build Structures
-    palette = get_biome_palette("Plains")
+    palette = get_palette(worldslice, heightmap, origin)
     print("Constructing buildings...")
     
     for hx, hy, hz, depth, facing in houses:
@@ -330,6 +330,6 @@ def generate_village(editor, buildArea, heightmap, worldslice, num_houses=10, nu
             build_houses.build_1fhouse(editor, hx, hy, hz, depth, 4, palette, facing)
             
     for fx, fy, fz in farms:
-        build_houses.build_farm(editor, fx, fy, fz, width=9, depth=9)
+        build_houses.build_farm(editor, fx, fy, fz, width=9, depth=9, palette=palette)
         
     print(f"Village generation complete. Placed {len(houses)} houses and {len(farms)} farms.")
