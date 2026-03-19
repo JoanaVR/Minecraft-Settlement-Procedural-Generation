@@ -71,66 +71,111 @@ def place_windows(editor, x, y, z, depth, facing):
         editor.placeBlock((wx, wy, wz), Block("glass_pane"))
 
 def place_stairs(editor, x, y, z, depth, middle_y, floor_block, facing, palette):
-    """Places stairs for a 2-story house with guaranteed head clearance."""
-    stair_x = x + 1 
-    stair_z = z + 1
-    stair_facing = "south"
-
+    """Places stairs on the wall opposite the door, sealing any wall holes."""
     stair_block = palette["roof"]
-    
+    wall_block  = Block(palette["walls"])
     stair_height = middle_y - y
-    steps = min(depth - 2, stair_height)
-
-    for i in range(steps):
-
-        editor.placeBlock((stair_x, y + i, stair_z + i), floor_block)  
-        editor.placeBlock((stair_x, y + i + 1, stair_z + i), Block(stair_block, {"facing": stair_facing}))
-        
-
-        editor.placeBlock((stair_x, middle_y, stair_z + i), Block("air"))
-        editor.placeBlock((stair_x, middle_y + 1, stair_z + i), Block("air"))
-        editor.placeBlock((stair_x, middle_y + 2, stair_z + i), Block("air"))
-
+ 
+    if facing == "north":
+        stair_x = x + 1
+        steps = min(depth - 2, stair_height)
+        for i in range(steps):
+            sz = z + depth - 1 - i
+            editor.placeBlock((stair_x, y + i,     sz), floor_block)
+            editor.placeBlock((stair_x, y + i + 1, sz), Block(stair_block, {"facing": "north"}))
+            for dy in range(3):
+                editor.placeBlock((stair_x, middle_y + dy, sz), Block("air"))
+        for dy in range(3):
+            editor.placeBlock((stair_x, middle_y + dy, z + depth), wall_block)
+ 
+    elif facing == "south":
+        stair_x = x + 1
+        steps = min(depth - 2, stair_height)
+        for i in range(steps):
+            sz = z + 1 + i
+            editor.placeBlock((stair_x, y + i,     sz), floor_block)
+            editor.placeBlock((stair_x, y + i + 1, sz), Block(stair_block, {"facing": "south"}))
+            for dy in range(3):
+                editor.placeBlock((stair_x, middle_y + dy, sz), Block("air"))
+        for dy in range(3):
+            editor.placeBlock((stair_x, middle_y + dy, z), wall_block)
+ 
+    elif facing == "east":
+        stair_z = z + 1
+        steps = min(depth - 2, stair_height)
+        for i in range(steps):
+            sx = x + 1 + i
+            editor.placeBlock((sx, y + i,     stair_z), floor_block)
+            editor.placeBlock((sx, y + i + 1, stair_z), Block(stair_block, {"facing": "east"}))
+            for dy in range(3):
+                editor.placeBlock((sx, middle_y + dy, stair_z), Block("air"))
+        for dy in range(3):
+            editor.placeBlock((x, middle_y + dy, stair_z), wall_block)
+ 
+    elif facing == "west":
+        stair_z = z + 1
+        steps = min(depth - 2, stair_height)
+        for i in range(steps):
+            sx = x + 3 - i
+            editor.placeBlock((sx, y + i,     stair_z), floor_block)
+            editor.placeBlock((sx, y + i + 1, stair_z), Block(stair_block, {"facing": "west"}))
+            for dy in range(3):
+                editor.placeBlock((sx, middle_y + dy, stair_z), Block("air"))
+        for dy in range(3):
+            editor.placeBlock((x + 4, middle_y + dy, stair_z), wall_block)
+ 
 def roof_placement(editor, x, y, z, height, depth, palette, facing):
-    """Symmetrical roof depending on facing direction, with filled gables."""
+    """Symmetrical pitched roof with upside-down stair accents on the eaves."""
     roof_stair_block = palette["roof"]
     wall_block = palette["walls"]
-
+ 
     if facing in ["north", "south"]:
-
-        for dx in range(-1, 4):
-            yy = y + height + 1 + dx
-            if dx > 2: 
-                break
-                
+        for dx in range(1, 4):
+            yy = y + height + 2 - dx
+ 
+            # Main roof slope
             leftBlock  = Block(roof_stair_block, {"facing": "east"})
             rightBlock = Block(roof_stair_block, {"facing": "west"})
-            placeCuboid(editor, (x+dx, yy, z-1), (x+dx, yy, z+depth+1), leftBlock)
-            placeCuboid(editor, (x+4-dx, yy, z-1), (x+4-dx, yy, z+depth+1), rightBlock)
-            
-
-            if 0 <= dx <= 2:
-                placeCuboid(editor, (x+dx, y+height+1, z), (x+dx, yy-1, z), Block(wall_block))
-                placeCuboid(editor, (x+4-dx, y+height+1, z), (x+4-dx, yy-1, z), Block(wall_block))
-                placeCuboid(editor, (x+dx, y+height+1, z+depth), (x+dx, yy-1, z+depth), Block(wall_block))
-                placeCuboid(editor, (x+4-dx, y+height+1, z+depth), (x+4-dx, yy-1, z+depth), Block(wall_block))
+            placeCuboid(editor, (x+2-dx, yy, z-1), (x+2-dx, yy, z+depth+1), leftBlock)
+            placeCuboid(editor, (x+2+dx, yy, z-1), (x+2+dx, yy, z+depth+1), rightBlock)
+ 
+            # Upside-down accent stairs on gable ends
+            accentLeft  = Block(roof_stair_block, {"facing": "west", "half": "top"})
+            accentRight = Block(roof_stair_block, {"facing": "east", "half": "top"})
+            for zz in [z-1, z+depth+1]:
+                editor.placeBlock((x+2-dx+1, yy, zz), accentLeft)
+                editor.placeBlock((x+2+dx-1, yy, zz), accentRight)
+ 
+            # Filled gable walls
+            if dx <= 2:
+                placeCuboid(editor, (x+2-dx, y+height+1, z),       (x+2-dx, yy-1, z),       Block(wall_block))
+                placeCuboid(editor, (x+2+dx, y+height+1, z),       (x+2+dx, yy-1, z),       Block(wall_block))
+                placeCuboid(editor, (x+2-dx, y+height+1, z+depth), (x+2-dx, yy-1, z+depth), Block(wall_block))
+                placeCuboid(editor, (x+2+dx, y+height+1, z+depth), (x+2+dx, yy-1, z+depth), Block(wall_block))
+ 
     else:
-
         for dz in range(-1, (depth//2) + 2):
             yy = y + height + 1 + dz
-            if z + dz > z + depth - dz: 
+            if z + dz > z + depth - dz:
                 break
-                
-            frontBlock  = Block(roof_stair_block, {"facing": "south"})
-            backBlock = Block(roof_stair_block, {"facing": "north"})
-            placeCuboid(editor, (x-1, yy, z+dz), (x+5, yy, z+dz), frontBlock)
+ 
+            frontBlock = Block(roof_stair_block, {"facing": "south"})
+            backBlock  = Block(roof_stair_block, {"facing": "north"})
+            placeCuboid(editor, (x-1, yy, z+dz),       (x+5, yy, z+dz),       frontBlock)
             placeCuboid(editor, (x-1, yy, z+depth-dz), (x+5, yy, z+depth-dz), backBlock)
-            
-
+ 
+            # Upside-down accent stairs on side eaves
             if dz >= 0 and (z + dz <= z + depth - dz):
-                placeCuboid(editor, (x, y+height+1, z+dz), (x, yy-1, z+dz), Block(wall_block))
-                placeCuboid(editor, (x, y+height+1, z+depth-dz), (x, yy-1, z+depth-dz), Block(wall_block))
-                placeCuboid(editor, (x+4, y+height+1, z+dz), (x+4, yy-1, z+dz), Block(wall_block))
+                accentFront = Block(roof_stair_block, {"facing": "north", "half": "top"})
+                accentBack  = Block(roof_stair_block, {"facing": "south", "half": "top"})
+                for xx in [x-1, x+5]:
+                    editor.placeBlock((xx, yy, z+dz+1),       accentFront)
+                    editor.placeBlock((xx, yy, z+depth-dz-1), accentBack)
+ 
+                # Filled gable walls
+                placeCuboid(editor, (x,   y+height+1, z+dz),       (x,   yy-1, z+dz),       Block(wall_block))
+                placeCuboid(editor, (x,   y+height+1, z+depth-dz), (x,   yy-1, z+depth-dz), Block(wall_block))
+                placeCuboid(editor, (x+4, y+height+1, z+dz),       (x+4, yy-1, z+dz),       Block(wall_block))
                 placeCuboid(editor, (x+4, y+height+1, z+depth-dz), (x+4, yy-1, z+depth-dz), Block(wall_block))
 
 def add_pillars(editor, x, y, z, depth, height, pillar_block):
@@ -182,6 +227,69 @@ def build_2fhouse(editor, x, y, z, depth, palette, facing):
     place_windows(editor, x, y, z, depth, facing)
     # 2nd floor windows
     place_windows(editor, x, y+4, z, depth, facing)
+
+# ─────────────────────────────────────────────
+#  Rule-Based House Classifier
+# ─────────────────────────────────────────────
+
+def classify_house(depth, slope, near_road, near_water):
+    """
+    Decides house type based on terrain and site context.
+
+    Rules (evaluated top-to-bottom, first match wins):
+      1. Waterlogged or very steep site  → skip (caller should not place)
+      2. Shallow depth footprint         → 1f  (not enough room for 2f stairs)
+      3. Steep-ish slope                 → 1f  (safer on uneven ground)
+      4. Flat + near road + deep enough  → 2f  (prime village plot)
+      5. Flat + no road                  → 1f  (quieter outskirts)
+      6. Default fallback                → 1f
+
+    Returns: "1f" or "2f"
+    """
+    # Rule 1: site too compromised for any house (let caller handle)
+    if near_water or slope > 4:
+        return "1f"  # fallback; caller already validates sites
+
+    # Rule 2: footprint too shallow to fit internal stairs comfortably
+    if depth < 5:
+        return "1f"
+
+    # Rule 3: noticeable slope — keep it low
+    if slope >= 2:
+        return "1f"
+
+    # Rule 4: ideal flat plot on a road → grander 2-storey
+    if slope < 2 and near_road and depth >= 5:
+        return "2f"
+
+    # Rule 5 / default
+    return "1f"
+
+
+def build_house(editor, x, y, z, depth, palette, facing,
+                slope=0, near_road=False, near_water=False):
+    """
+    Rule-based dispatcher. Classifies the site and calls the
+    appropriate builder. Drop-in replacement for the random branch
+    in path_finding.generate_village.
+
+    Usage in path_finding.py — replace:
+        if random.random() < 0.4:
+            build_houses.build_2fhouse(editor, hx, hy, hz, depth, palette, facing)
+        else:
+            build_houses.build_1fhouse(editor, hx, hy, hz, depth, 4, palette, facing)
+
+    With:
+        build_houses.build_house(editor, hx, hy, hz, depth, palette, facing,
+                                 slope=slope, near_road=near_road)
+    """
+    house_type = classify_house(depth, slope, near_road, near_water)
+
+    if house_type == "2f":
+        build_2fhouse(editor, x, y, z, depth, palette, facing)
+    else:
+        build_1fhouse(editor, x, y, z, depth, 4, palette, facing)
+
 
 def build_farm(editor, x, y, z, width, depth, palette):
     log_block = palette["pillars"]

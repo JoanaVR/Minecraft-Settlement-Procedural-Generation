@@ -347,7 +347,7 @@ def build_well(editor, x, y, z, palette=None):
         for dz in range(-1, 2):
             if dx == 0 and dz == 0:
                 editor.placeBlock((x, y+3, z), Block(f"{roof_mat}_slab", {"type": "bottom"}))
-                editor.placeBlock((x, y+2, z), Block("chain", {"axis": "y"}))
+                editor.placeBlock((x, y+2, z), Block("iron_chain", {"axis": "y"}))
                 editor.placeBlock((x, y+1, z), Block("lantern", {"hanging": "true"}))
             elif abs(dx) + abs(dz) == 2:
                 editor.placeBlock((x+dx, y+3, z+dz), Block(f"{roof_mat}_slab", {"type": "bottom"}))
@@ -400,10 +400,9 @@ def generate_village(editor, buildArea, heightmap, worldslice, num_houses=10, nu
 
     print("Constructing buildings...")
     for hx, hy, hz, depth, facing in houses:
-        if random.random() < 0.4:
-            build_houses.build_2fhouse(editor, hx, hy, hz, depth, palette, facing)
-        else:
-            build_houses.build_1fhouse(editor, hx, hy, hz, depth, 4, palette, facing)
+        slope = slope_in_area(heightmap, origin, hx, hz, 5, depth)
+        near_road = len(road_tiles) > 0  # road exists by the time houses are placed
+        build_houses.build_house(editor, hx, hy, hz, depth, palette, facing,slope=slope, near_road=near_road)
             
     for fx, fy, fz in farms:
         build_houses.build_farm(editor, fx, fy, fz, width=9, depth=9, palette=palette)
