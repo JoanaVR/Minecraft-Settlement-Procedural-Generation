@@ -2,9 +2,7 @@ import random
 from gdpc import Block
 from gdpc.geometry import placeCuboid, placeCuboidHollow
 
-# ─────────────────────────────────────────────
 #  House Placement Logic
-# ─────────────────────────────────────────────
 
 def get_door_outside_pos(x, z, depth, facing):
     """Returns the (x, z) coordinate immediately outside the door for pathfinding."""
@@ -184,9 +182,7 @@ def add_pillars(editor, x, y, z, depth, height, pillar_block):
         for cz in (z, z+depth):
             placeCuboid(editor, (cx, y, cz), (cx, y+height, cz), Block(pillar_block))
 
-# ─────────────────────────────────────────────
 #  Main Builders
-# ─────────────────────────────────────────────
 
 def build_1fhouse(editor, x, y, z, depth, height, palette, facing):
     wall = Block(palette["walls"])
@@ -228,9 +224,7 @@ def build_2fhouse(editor, x, y, z, depth, palette, facing):
     # 2nd floor windows
     place_windows(editor, x, y+4, z, depth, facing)
 
-# ─────────────────────────────────────────────
 #  Rule-Based House Classifier
-# ─────────────────────────────────────────────
 
 def classify_house(depth, slope, near_road, near_water):
     """

@@ -1,7 +1,5 @@
 import random
 
-
-
 def tree_scanner(worldslice, heightmap, origin):
     ox, oz = origin
     sx, sz = heightmap.shape

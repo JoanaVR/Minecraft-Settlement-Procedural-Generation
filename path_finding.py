@@ -7,9 +7,7 @@ from gdpc import Block
 from biome_palette import get_palette
 import build_houses
 
-# ─────────────────────────────────────────────
 #  Helpers & Terrain Evaluation
-# ─────────────────────────────────────────────
 
 def get_height(heightmap, x, z, origin):
     ox, oz = origin
@@ -58,9 +56,18 @@ def is_valid_site(worldslice, heightmap, origin, x, z, width=5, depth=5, max_slo
             if is_water_ws(worldslice, x + dx, z + dz, origin): return False
     return True
 
-# ─────────────────────────────────────────────
+def is_build_area_wholly_water(worldslice, heightmap, origin, sample_step=10):
+    """Check if the entire build area is water by sampling points."""
+    ox, oz = origin
+    sx, sz = heightmap.shape
+    for lx in range(0, sx, sample_step):
+        for lz in range(0, sz, sample_step):
+            x, z = ox + lx, oz + lz
+            if not is_water_ws(worldslice, x, z, origin):
+                return False
+    return True
+
 #  Footprint Management
-# ─────────────────────────────────────────────
 
 def footprint(hx, hz, width=5, depth=5, padding=2):
     cells = set()
@@ -75,9 +82,7 @@ def overlaps_any(hx, hz, placed_footprints, width=5, depth=5, padding=2):
         if fp & existing: return True
     return False
 
-# ─────────────────────────────────────────────
 #  Algorithm 1: A* Path-finder (8-Way Adaptive)
-# ─────────────────────────────────────────────
 
 class Node:
     def __init__(self, pos, g=0, h=0, parent=None):
@@ -129,6 +134,9 @@ def astar_to_network(start, existing_network, heightmap, origin, worldslice=None
             
             if not valid(nxt) or nxt in closed or nxt in strict_buildings: continue
 
+            if worldslice and is_water_ws(worldslice, nxt[0], nxt[1], origin):
+                continue   # avoid water for all connecting paths
+            
             h1 = get_height(heightmap, current.pos[0], current.pos[1], origin)
             h2 = get_height(heightmap, nxt[0], nxt[1], origin)
             
@@ -140,9 +148,7 @@ def astar_to_network(start, existing_network, heightmap, origin, worldslice=None
             
     return []
 
-# ─────────────────────────────────────────────
 #  Algorithm 2: Minecraft Jigsaw Layout Generator
-# ─────────────────────────────────────────────
 
 def generate_layout(worldslice, heightmap, origin, num_houses, num_farms):
     ox, oz = origin
@@ -155,8 +161,19 @@ def generate_layout(worldslice, heightmap, origin, num_houses, num_farms):
         if is_valid_site(worldslice, heightmap, origin, cx-3, cz-3, 7, 7, max_slope=2):
             center = (cx, cz)
             break
-    if center is None: center = (ox + sx // 2, oz + sz // 2)
-    cx, cz = center
+    # if center is None: center = (ox + sx // 2, oz + sz // 2)
+    # cx, cz = center
+    if center is None:
+        print("No valid center found for village, aborting layout generation.")
+        return [], [], set(), None, set()  # no valid center abort
+
+    # # center path/posts
+    # for dx in range(-3, 4):
+    #     for dz in range(-3, 4):
+    #         if math.hypot(dx, dz) <= 3:
+    #             tx, tz = cx + dx, cz + dz
+    #             if not is_water_ws(worldslice, tx, tz, origin):
+    #                 road_tiles.add((tx, tz))
 
     road_tiles = set()
     houses = []
@@ -164,10 +181,13 @@ def generate_layout(worldslice, heightmap, origin, num_houses, num_farms):
     placed_footprints = []
     exact_building_tiles = set() 
     
+    # center path/posts, skip any water
     for dx in range(-3, 4):
         for dz in range(-3, 4):
             if math.hypot(dx, dz) <= 3:
-                road_tiles.add((cx + dx, cz + dz))
+                tx, tz = cx + dx, cz + dz
+                if not is_water_ws(worldslice, tx, tz, origin):
+                    road_tiles.add((tx, tz))
                 
     well_fp = footprint(cx-2, cz-2, 5, 5, padding=1)
     placed_footprints.append(well_fp)
@@ -201,7 +221,7 @@ def generate_layout(worldslice, heightmap, origin, num_houses, num_farms):
                 rz += dz
             
             if not in_bounds(rx, rz, heightmap, origin): break
-            
+            if is_water_ws(worldslice, rx, rz, origin): break   # stop path into water
             road_tiles.add((rx, rz))
 
             if step % 6 == 0 and step > 3:
@@ -260,9 +280,8 @@ def generate_layout(worldslice, heightmap, origin, num_houses, num_farms):
                 
     return houses, farms, road_tiles, center, exact_building_tiles
 
-# ─────────────────────────────────────────────
+
 #  Decor & Construction (Terrain-Adaptive Thicken)
-# ─────────────────────────────────────────────
 
 def thicken_path_network(road_tiles, worldslice, heightmap, origin, exact_building_tiles):
     """Expands paths organically, respecting terrain slopes and building walls."""
@@ -270,6 +289,8 @@ def thicken_path_network(road_tiles, worldslice, heightmap, origin, exact_buildi
 
 
     for rx, rz in road_tiles:
+        if is_water_ws(worldslice, rx, rz, origin):
+            continue
         thick_roads.add((rx, rz))
         is_center_water = is_water_ws(worldslice, rx, rz, origin)
         center_h = get_height(heightmap, rx, rz, origin)
@@ -280,7 +301,7 @@ def thicken_path_network(road_tiles, worldslice, heightmap, origin, exact_buildi
             
             # Prevent clipping into houses
             if (nx, nz) in exact_building_tiles: continue
-            
+            if is_water_ws(worldslice, nx, nz, origin): continue
             # Prevent spilling land paths outward into water
             if not is_center_water and is_water_ws(worldslice, nx, nz, origin): continue
             
@@ -297,12 +318,13 @@ def thicken_path_network(road_tiles, worldslice, heightmap, origin, exact_buildi
 
     fringe = set()
     for rx, rz in list(thick_roads):
-        is_center_water = is_water_ws(worldslice, rx, rz, origin)
+        if is_water_ws(worldslice, rx, rz, origin):
+            continue
+        #is_center_water = is_water_ws(worldslice, rx, rz, origin)
         for dx, dz in [(1,0), (-1,0), (0,1), (0,-1)]:
             nx, nz = rx + dx, rz + dz
             if (nx, nz) not in thick_roads and (nx, nz) not in exact_building_tiles:
                 if not is_center_water and is_water_ws(worldslice, nx, nz, origin): continue
-
                 if random.random() < 0.25: 
                     fringe.add((nx, nz))
 
@@ -375,20 +397,29 @@ def place_road(editor, heightmap, origin, road_tiles, worldslice, palette):
         else:
             editor.placeBlock((x, y-1, z), Block("dirt_path"))
 
-# ─────────────────────────────────────────────
 #  Master generate function
-# ─────────────────────────────────────────────
-
 def generate_village(editor, buildArea, heightmap, worldslice, num_houses=10, num_farms=1):
     origin = (buildArea.offset.x, buildArea.offset.z)
     
+    if is_build_area_wholly_water(worldslice, heightmap, origin):
+        print("Build area is wholly water; skipping village generation.")
+        return
+
     palette = get_palette(worldslice, heightmap, origin)
 
     print("Tracing jigsaw street layouts...")
     houses, farms, road_tiles, center, exact_building_tiles = generate_layout(worldslice, heightmap, origin, num_houses, num_farms)
+    if center is None or (not houses and not farms and not road_tiles):
+        print("No viable land layout found; skipping village generation.")
+        return
 
     print("Thickening roads and adding natural variation...")
     road_tiles = thicken_path_network(road_tiles, worldslice, heightmap, origin, exact_building_tiles)
+
+    road_tiles = { (x, z) for (x, z) in road_tiles if not is_water_ws(worldslice, x, z, origin) }
+    if not road_tiles:
+        print("All roads are over water after thickening; aborting.")
+        return
 
     print("Weaving road network and bridges...")
     place_road(editor, heightmap, origin, road_tiles, worldslice, palette)
