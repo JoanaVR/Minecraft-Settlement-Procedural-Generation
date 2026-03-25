@@ -19,37 +19,31 @@ def opposite_facing(facing):
 def doorplacement(editor, x, y, z, depth, facing, palette):
     """Places the door and ensures a clear, level step outside."""
     outside_pos = get_door_outside_pos(x, z, depth, facing)
-    dx, dz = 0, 0
 
+    # Adjusting door block to match the new lowered floor heights
     if facing == "north":
         door_pos = (x+2, y+1, z)
-        dz = -1
     elif facing == "south":
         door_pos = (x+2, y+1, z+depth)
-        dz = 1
     elif facing == "east":
         door_pos = (x+4, y+1, z+depth//2)
-        dx = 1
     elif facing == "west":
         door_pos = (x, y+1, z+depth//2)
-        dx = -1
 
     wood_type = palette["walls"].replace("_planks","")
     editor.placeBlock(door_pos, Block(f"{wood_type}_door", {"facing": facing, "half": "lower"}))
     editor.placeBlock((door_pos[0], door_pos[1]+1, door_pos[2]), Block(f"{wood_type}_door", {"facing": facing, "half": "upper"}))
     
+    # Overwrite the perimeter wall below the door to be a floor block (sill)
+    editor.placeBlock((door_pos[0], y, door_pos[2]), Block(palette["floor"]))
+
     ox, oz = outside_pos
-    step_block = palette["roof"]
     
-
-    if "stairs" in step_block:
-        editor.placeBlock((ox, y, oz), Block(step_block, {"facing": opposite_facing(facing)}))
-    else:
-        editor.placeBlock((ox, y, oz), Block("cobblestone_slab"))
-
-
-    for dy in range(1, 5):
+    # Clear space above the outside block and replace stairs logic with a flush dirt path
+    for dy in range(1, 4):
         editor.placeBlock((ox, y+dy, oz), Block("air"))
+    
+    editor.placeBlock((ox, y, oz), Block("dirt_path"))
 
 def place_windows(editor, x, y, z, depth, facing):
     """Places symmetrical windows based on house direction."""
@@ -60,7 +54,6 @@ def place_windows(editor, x, y, z, depth, facing):
         (x+4, y+2, z+1), (x+4, y+2, z+depth-1)          # East wall
     ]
     
-
     for wx, wy, wz in window_blocks:
         if facing == "north" and wz == z: continue
         if facing == "south" and wz == z+depth: continue
@@ -188,12 +181,24 @@ def build_1fhouse(editor, x, y, z, depth, height, palette, facing):
     wall = Block(palette["walls"])
     floor = Block(palette["floor"])
     pillar = palette["pillars"]
-    roof = palette["roof"]
 
-    # Main structure
+    # Clear space above the house so it's carved out of steep hillsides
+    placeCuboid(editor, (x, y, z), (x+4, y+height+6, z+depth), Block("air"))
+
+    # Sink the entire structure by 1 block so the internal floor exactly matches the path outside
+    y -= 1 
+
+    # Deep Foundation (15 blocks) to anchor perfectly onto any slope
+    placeCuboid(editor, (x, y-15, z), (x+4, y-1, z+depth), Block("cobblestone"))
+
+    # Hollow wall shell
     placeCuboidHollow(editor, (x, y, z), (x+4, y+height, z+depth), wall)
-    placeCuboid(editor, (x, y-5, z), (x+4, y, z+depth), floor) # Foundation
-    placeCuboid(editor, (x+1, y+1, z+1), (x+3, y+height, z+depth-1), Block("air")) # Interior clear
+    
+    # Fill in just the inner floor layer explicitly
+    placeCuboid(editor, (x+1, y, z+1), (x+3, y, z+depth-1), floor) 
+    
+    # Ensure interior is open
+    placeCuboid(editor, (x+1, y+1, z+1), (x+3, y+height-1, z+depth-1), Block("air")) 
 
     add_pillars(editor, x, y, z, depth, height, pillar)
     roof_placement(editor, x, y, z, height, depth, palette, facing)
@@ -202,15 +207,24 @@ def build_1fhouse(editor, x, y, z, depth, height, palette, facing):
 
 def build_2fhouse(editor, x, y, z, depth, palette, facing):
     height = 8 # 2 floors
+    
+    placeCuboid(editor, (x, y, z), (x+4, y+height+6, z+depth), Block("air"))
+    
+    y -= 1
+
     wall = Block(palette["walls"])
     floor = Block(palette["floor"])
     pillar = palette["pillars"]
-    roof = palette["roof"]
 
-    # Main structure
+    # Deep cobblestone foundation for steep drops
+    placeCuboid(editor, (x, y-15, z), (x+4, y-1, z+depth), Block("cobblestone"))
+
+    # Main structure shell
     placeCuboidHollow(editor, (x, y, z), (x+4, y+height, z+depth), wall)
-    placeCuboid(editor, (x, y-5, z), (x+4, y, z+depth), floor) # Foundation
-    placeCuboid(editor, (x+1, y+1, z+1), (x+3, y+height, z+depth-1), Block("air")) # Interior clear
+    
+    # Interior floor
+    placeCuboid(editor, (x+1, y, z+1), (x+3, y, z+depth-1), floor) 
+    placeCuboid(editor, (x+1, y+1, z+1), (x+3, y+height-1, z+depth-1), Block("air")) 
 
     # 2nd Floor
     middle_y = y + 4
@@ -220,62 +234,26 @@ def build_2fhouse(editor, x, y, z, depth, palette, facing):
     place_stairs(editor, x, y, z, depth, middle_y, floor, facing, palette)
     roof_placement(editor, x, y, z, height, depth, palette, facing)
     doorplacement(editor, x, y, z, depth, facing, palette)
+    
     place_windows(editor, x, y, z, depth, facing)
-    # 2nd floor windows
-    place_windows(editor, x, y+4, z, depth, facing)
+    place_windows(editor, x, middle_y, z, depth, facing)
 
-#  Rule-Based House Classifier
 
 def classify_house(depth, slope, near_road, near_water):
     """
     Decides house type based on terrain and site context.
-
-    Rules (evaluated top-to-bottom, first match wins):
-      1. Waterlogged or very steep site  → skip (caller should not place)
-      2. Shallow depth footprint         → 1f  (not enough room for 2f stairs)
-      3. Steep-ish slope                 → 1f  (safer on uneven ground)
-      4. Flat + near road + deep enough  → 2f  (prime village plot)
-      5. Flat + no road                  → 1f  (quieter outskirts)
-      6. Default fallback                → 1f
-
-    Returns: "1f" or "2f"
+    Adapted to allow generating on any terrain without rigid aborts.
     """
-    # Rule 1: site too compromised for any house (let caller handle)
-    if near_water or slope > 4:
-        return "1f"  # fallback; caller already validates sites
-
-    # Rule 2: footprint too shallow to fit internal stairs comfortably
-    if depth < 5:
-        return "1f"
-
-    # Rule 3: noticeable slope — keep it low
-    if slope >= 2:
-        return "1f"
-
-    # Rule 4: ideal flat plot on a road → grander 2-storey
-    if slope < 2 and near_road and depth >= 5:
-        return "2f"
-
-    # Rule 5 / default
+    if near_water: return "1f" 
+    if depth < 5: return "1f"
+    if near_road and depth >= 5: return "2f"
+    
     return "1f"
-
 
 def build_house(editor, x, y, z, depth, palette, facing,
                 slope=0, near_road=False, near_water=False):
     """
-    Rule-based dispatcher. Classifies the site and calls the
-    appropriate builder. Drop-in replacement for the random branch
-    in path_finding.generate_village.
-
-    Usage in path_finding.py — replace:
-        if random.random() < 0.4:
-            build_houses.build_2fhouse(editor, hx, hy, hz, depth, palette, facing)
-        else:
-            build_houses.build_1fhouse(editor, hx, hy, hz, depth, 4, palette, facing)
-
-    With:
-        build_houses.build_house(editor, hx, hy, hz, depth, palette, facing,
-                                 slope=slope, near_road=near_road)
+    Rule-based dispatcher. Classifies the site and calls the appropriate builder.
     """
     house_type = classify_house(depth, slope, near_road, near_water)
 
@@ -286,11 +264,18 @@ def build_house(editor, x, y, z, depth, palette, facing,
 
 
 def build_farm(editor, x, y, z, width, depth, palette):
+    placeCuboid(editor, (x, y, z), (x+width-1, y+6, z+depth-1), Block("air"))
+    
+    y -= 1
+    
+    placeCuboid(editor, (x, y-15, z), (x+width-1, y-1, z+depth-1), Block("dirt"))
+
     log_block = palette["pillars"]
     for i in range(width):
         for j in range(depth):
             if i == 0 or i == width-1 or j == 0 or j == depth-1:
                 editor.placeBlock((x+i, y, z+j), Block(log_block))
+                
     for i in range(1, width-1):
         for j in range(1, depth-1):
             editor.placeBlock((x+i, y, z+j), Block("farmland"))
@@ -298,6 +283,7 @@ def build_farm(editor, x, y, z, width, depth, palette):
     water_z = z + depth // 2
     for i in range(1, width-1):
         editor.placeBlock((x+i, y, water_z), Block("water"))
+        editor.placeBlock((x+i, y+1, water_z), Block("air")) 
 
     crops = ["wheat[age=7]", "carrots[age=7]", "potatoes[age=7]"]
     for i in range(1, width-1):
