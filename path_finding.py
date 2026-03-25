@@ -1,4 +1,3 @@
-
 import random
 import heapq
 import math
@@ -46,7 +45,8 @@ def slope_in_area(heightmap, origin, x, z, width=5, depth=5):
     if not heights: return 999
     return max(heights) - min(heights)
 
-def is_valid_site(worldslice, heightmap, origin, x, z, width=5, depth=5, max_slope=2):
+# Increased max_slope to allow adaptable hill generation
+def is_valid_site(worldslice, heightmap, origin, x, z, width=5, depth=5, max_slope=15):
     if not in_bounds(x, z, heightmap, origin) or not in_bounds(x + width, z + depth, heightmap, origin):
         return False
     if slope_in_area(heightmap, origin, x, z, width, depth) > max_slope: 
@@ -135,12 +135,12 @@ def astar_to_network(start, existing_network, heightmap, origin, worldslice=None
             if not valid(nxt) or nxt in closed or nxt in strict_buildings: continue
 
             if worldslice and is_water_ws(worldslice, nxt[0], nxt[1], origin):
-                continue   # avoid water for all connecting paths
+                continue  
             
             h1 = get_height(heightmap, current.pos[0], current.pos[1], origin)
             h2 = get_height(heightmap, nxt[0], nxt[1], origin)
-            
-            slope_cost = abs(h1 - h2) * 5
+
+            slope_cost = abs(h1 - h2) * 2
             water_cost = water_penalty if (worldslice and is_water_ws(worldslice, nxt[0], nxt[1], origin)) else 0
 
             cost = move_cost + slope_cost + water_cost
@@ -158,22 +158,13 @@ def generate_layout(worldslice, heightmap, origin, num_houses, num_farms):
     for _ in range(100):
         cx = ox + random.randint(sx // 4, 3 * sx // 4)
         cz = oz + random.randint(sz // 4, 3 * sz // 4)
-        if is_valid_site(worldslice, heightmap, origin, cx-3, cz-3, 7, 7, max_slope=2):
+        if is_valid_site(worldslice, heightmap, origin, cx-3, cz-3, 7, 7, max_slope=15):
             center = (cx, cz)
             break
-    # if center is None: center = (ox + sx // 2, oz + sz // 2)
-    # cx, cz = center
+            
     if center is None:
         print("No valid center found for village, aborting layout generation.")
-        return [], [], set(), None, set()  # no valid center abort
-
-    # # center path/posts
-    # for dx in range(-3, 4):
-    #     for dz in range(-3, 4):
-    #         if math.hypot(dx, dz) <= 3:
-    #             tx, tz = cx + dx, cz + dz
-    #             if not is_water_ws(worldslice, tx, tz, origin):
-    #                 road_tiles.add((tx, tz))
+        return [], [], set(), None, set()  
 
     road_tiles = set()
     houses = []
@@ -181,7 +172,7 @@ def generate_layout(worldslice, heightmap, origin, num_houses, num_farms):
     placed_footprints = []
     exact_building_tiles = set() 
     
-    # center path/posts, skip any water
+
     for dx in range(-3, 4):
         for dz in range(-3, 4):
             if math.hypot(dx, dz) <= 3:
@@ -193,7 +184,6 @@ def generate_layout(worldslice, heightmap, origin, num_houses, num_farms):
     placed_footprints.append(well_fp)
     exact_building_tiles.update(footprint(cx-2, cz-2, 5, 5, padding=0))
     
-
     queue = [
         (cx, cz - 3, 0, -1, random.randint(15, 30)), # North
         (cx, cz + 3, 0, 1, random.randint(15, 30)),  # South
@@ -210,9 +200,8 @@ def generate_layout(worldslice, heightmap, origin, num_houses, num_farms):
         rx, rz, dx, dz, length = queue.pop(0)
         
         for step in range(length):
-            # gently curve the paths instead of keeping them totally rigid
             if step > 2 and random.random() < 0.15:
-                shift_dx, shift_dz = -dz, dx # Perpendicular vector
+                shift_dx, shift_dz = -dz, dx 
                 if random.random() < 0.5: shift_dx, shift_dz = -shift_dx, -shift_dz
                 rx += shift_dx
                 rz += shift_dz
@@ -221,7 +210,7 @@ def generate_layout(worldslice, heightmap, origin, num_houses, num_farms):
                 rz += dz
             
             if not in_bounds(rx, rz, heightmap, origin): break
-            if is_water_ws(worldslice, rx, rz, origin): break   # stop path into water
+            if is_water_ws(worldslice, rx, rz, origin): break   
             road_tiles.add((rx, rz))
 
             if step % 6 == 0 and step > 3:
@@ -246,20 +235,24 @@ def generate_layout(worldslice, heightmap, origin, num_houses, num_farms):
                     if not in_bounds(hx, hz, heightmap, origin) or not in_bounds(hx+width, hz+depth, heightmap, origin):
                         continue
                         
-                    if is_valid_site(worldslice, heightmap, origin, hx, hz, width, depth, max_slope=3):
+
+                    if is_valid_site(worldslice, heightmap, origin, hx, hz, width, depth, max_slope=15):
                         if not overlaps_any(hx, hz, placed_footprints, width, depth, padding=2):
                             
-                            hy = get_height(heightmap, hx, hz, origin)
+
                             if is_farm:
+                                hy = get_height(heightmap, hx + width//2, hz + depth//2, origin)
                                 farms.append((hx, hy, hz))
                             else:
+                                door_x, door_z = build_houses.get_door_outside_pos(hx, hz, depth, facing)
+                                door_y = get_height(heightmap, door_x, door_z, origin)
+                                hy = door_y if door_y is not None else get_height(heightmap, hx, hz, origin)
                                 houses.append((hx, hy, hz, depth, facing))
                                 
                             placed_footprints.append(footprint(hx, hz, width, depth, padding=2))
                             exact_building_tiles.update(footprint(hx, hz, width, depth, padding=0))
                             buildings_placed += 1
                             
-    
                             if not is_farm:
                                 door_x, door_z = build_houses.get_door_outside_pos(hx, hz, depth, facing)
                                 path = astar_to_network((door_x, door_z), road_tiles, heightmap, origin, worldslice, strict_buildings=exact_building_tiles)
@@ -281,12 +274,11 @@ def generate_layout(worldslice, heightmap, origin, num_houses, num_farms):
     return houses, farms, road_tiles, center, exact_building_tiles
 
 
-#  Decor & Construction (Terrain-Adaptive Thicken)
+
 
 def thicken_path_network(road_tiles, worldslice, heightmap, origin, exact_building_tiles):
     """Expands paths organically, respecting terrain slopes and building walls."""
     thick_roads = set()
-
 
     for rx, rz in road_tiles:
         if is_water_ws(worldslice, rx, rz, origin):
@@ -295,22 +287,17 @@ def thicken_path_network(road_tiles, worldslice, heightmap, origin, exact_buildi
         is_center_water = is_water_ws(worldslice, rx, rz, origin)
         center_h = get_height(heightmap, rx, rz, origin)
 
-
         for dx, dz in [(1,0), (-1,0), (0,1), (0,-1), (1,1), (-1,1), (1,-1), (-1,-1)]:
             nx, nz = rx + dx, rz + dz
             
-            # Prevent clipping into houses
             if (nx, nz) in exact_building_tiles: continue
             if is_water_ws(worldslice, nx, nz, origin): continue
-            # Prevent spilling land paths outward into water
             if not is_center_water and is_water_ws(worldslice, nx, nz, origin): continue
             
-            # Prevent spreading vertically up steep cliffs
             neighbor_h = get_height(heightmap, nx, nz, origin)
             if center_h is not None and neighbor_h is not None:
-                if abs(center_h - neighbor_h) > 1: continue 
+                if abs(center_h - neighbor_h) > 3: continue 
             
-            # Diagonals have a chance to drop off for a bumpy, organic edge
             is_diag = (abs(dx) + abs(dz) == 2)
             if is_diag and random.random() > 0.6: continue
                 
@@ -320,7 +307,6 @@ def thicken_path_network(road_tiles, worldslice, heightmap, origin, exact_buildi
     for rx, rz in list(thick_roads):
         if is_water_ws(worldslice, rx, rz, origin):
             continue
-        #is_center_water = is_water_ws(worldslice, rx, rz, origin)
         for dx, dz in [(1,0), (-1,0), (0,1), (0,-1)]:
             nx, nz = rx + dx, rz + dz
             if (nx, nz) not in thick_roads and (nx, nz) not in exact_building_tiles:
@@ -341,6 +327,11 @@ def build_well(editor, x, y, z, palette=None):
     if palette and "roof" in palette:
         roof_mat = palette["roof"].replace("_stairs", "")
 
+    for dy in range(1, 6):
+        for dx in range(-1, 2):
+            for dz in range(-1, 2):
+                editor.placeBlock((x+dx, y+dy, z+dz), Block("air"))
+
     for dy in range(-4, 0):
         for dx in range(-1, 2):
             for dz in range(-1, 2):
@@ -360,7 +351,6 @@ def build_well(editor, x, y, z, palette=None):
                 stair_block = random.choice(["cobblestone_stairs", "stone_brick_stairs"])
                 editor.placeBlock((x+dx, y, z+dz), Block(stair_block, {"facing": facing}))
 
-
     for dx, dz in [(-1,-1), (-1,1), (1,-1), (1,1)]:
         editor.placeBlock((x+dx, y+1, z+dz), Block(f"{wood_type}_fence"))
         editor.placeBlock((x+dx, y+2, z+dz), Block(f"{wood_type}_fence"))
@@ -378,7 +368,6 @@ def build_well(editor, x, y, z, palette=None):
                 editor.placeBlock((x+dx, y+3, z+dz), Block(f"{roof_mat}_stairs", {"facing": facing}))
 
 def place_road(editor, heightmap, origin, road_tiles, worldslice, palette):
-
     bridge_block = palette["walls"]
     if "planks" in palette["floor"]:
         bridge_block = palette["floor"]
@@ -391,13 +380,13 @@ def place_road(editor, heightmap, origin, road_tiles, worldslice, palette):
         editor.placeBlock((x, y+1, z), Block("air"))
         editor.placeBlock((x, y+2, z), Block("air"))
 
-        # Water bridges vs Dirt paths
+
         if is_water_ws(worldslice, x, z, origin):
             editor.placeBlock((x, y-1, z), Block(bridge_block))
         else:
             editor.placeBlock((x, y-1, z), Block("dirt_path"))
 
-#  Master generate function
+
 def generate_village(editor, buildArea, heightmap, worldslice, num_houses=10, num_farms=1):
     origin = (buildArea.offset.x, buildArea.offset.z)
     
@@ -407,13 +396,13 @@ def generate_village(editor, buildArea, heightmap, worldslice, num_houses=10, nu
 
     palette = get_palette(worldslice, heightmap, origin)
 
-    print("Tracing jigsaw street layouts...")
+    print("Tracing adaptable jigsaw layouts...")
     houses, farms, road_tiles, center, exact_building_tiles = generate_layout(worldslice, heightmap, origin, num_houses, num_farms)
     if center is None or (not houses and not farms and not road_tiles):
         print("No viable land layout found; skipping village generation.")
         return
 
-    print("Thickening roads and adding natural variation...")
+    print("Thickening roads and handling hills...")
     road_tiles = thicken_path_network(road_tiles, worldslice, heightmap, origin, exact_building_tiles)
 
     road_tiles = { (x, z) for (x, z) in road_tiles if not is_water_ws(worldslice, x, z, origin) }
@@ -429,11 +418,11 @@ def generate_village(editor, buildArea, heightmap, worldslice, num_houses=10, nu
     cy = get_height(heightmap, cx, cz, origin)
     if cy is not None: build_well(editor, cx, cy, cz, palette)
 
-    print("Constructing buildings...")
+    print("Constructing buildings with adaptive foundations...")
     for hx, hy, hz, depth, facing in houses:
         slope = slope_in_area(heightmap, origin, hx, hz, 5, depth)
-        near_road = len(road_tiles) > 0  # road exists by the time houses are placed
-        build_houses.build_house(editor, hx, hy, hz, depth, palette, facing,slope=slope, near_road=near_road)
+        near_road = len(road_tiles) > 0 
+        build_houses.build_house(editor, hx, hy, hz, depth, palette, facing, slope=slope, near_road=near_road)
             
     for fx, fy, fz in farms:
         build_houses.build_farm(editor, fx, fy, fz, width=9, depth=9, palette=palette)
