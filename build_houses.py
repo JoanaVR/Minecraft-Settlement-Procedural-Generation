@@ -31,9 +31,12 @@ def doorplacement(editor, x, y, z, depth, facing, palette):
         door_pos = (x, y+1, z+depth//2)
 
     wood_type = palette["walls"].replace("_planks","").replace("_log", "").replace("_stem", "")
-    editor.placeBlock(door_pos, Block(f"{wood_type}_door", {"facing": facing, "half": "lower"}))
-    editor.placeBlock((door_pos[0], door_pos[1]+1, door_pos[2]), Block(f"{wood_type}_door", {"facing": facing, "half": "upper"}))
     
+    editor.placeBlock(door_pos, Block(f"{wood_type}_door", {"facing": facing, "half": "lower"}))
+    
+    editor.placeBlock((door_pos[0], door_pos[1]+1, door_pos[2]), Block(f"{wood_type}_door", {"facing": facing, "half": "upper"}))
+    stair_type =palette["roof"]
+    editor.placeBlock((door_pos[0], door_pos[1]+2, door_pos[2]), Block(stair_type, {"facing": facing, "half": "top"}))
     # Overwrite the perimeter wall below the door to be a floor block (sill)
     editor.placeBlock((door_pos[0], y, door_pos[2]), Block(palette["floor"]))
 
@@ -59,7 +62,7 @@ def place_windows(editor, x, y, z, depth, facing):
         if facing == "south" and wz == z+depth: continue
         if facing == "east" and wx == x+4: continue
         if facing == "west" and wx == x: continue
-        editor.placeBlock((wx, wy, wz), Block("glass_pane"))
+        editor.placeBlock((wx, wy, wz), Block("glass"))
 
 def place_stairs(editor, x, y, z, depth, middle_y, floor_block, facing, palette):
     """Places stairs on the wall opposite the door, sealing any wall holes."""
