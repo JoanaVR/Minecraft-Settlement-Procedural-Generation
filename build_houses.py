@@ -30,7 +30,7 @@ def doorplacement(editor, x, y, z, depth, facing, palette):
     elif facing == "west":
         door_pos = (x, y+1, z+depth//2)
 
-    wood_type = palette["walls"].replace("_planks","")
+    wood_type = palette["walls"].replace("_planks","").replace("_log", "").replace("_stem", "")
     editor.placeBlock(door_pos, Block(f"{wood_type}_door", {"facing": facing, "half": "lower"}))
     editor.placeBlock((door_pos[0], door_pos[1]+1, door_pos[2]), Block(f"{wood_type}_door", {"facing": facing, "half": "upper"}))
     

@@ -14,14 +14,14 @@ def tree_scanner(worldslice, heightmap, origin):
             
             y = int(heightmap[lx, lz])
 
-            # Check down a few blocks (heightmaps often return Y+1)
+            # Check down a few blocks of the tree log
             for dy in range(0, -5, -1):
                 try:
                     block = worldslice.getBlock((lx,y + dy, lz))
                     
                     
-                    raw_id = block.id if hasattr(block, "id") else block
-                    block_id = raw_id.split(":")[-1]
+                    full_id = block.id if hasattr(block, "id") else block
+                    block_id = full_id.split(":")[-1]
 
                     if "log" in block_id or "stem" in block_id:
                         tree_counter[block_id] = tree_counter.get(block_id, 0) + 1
@@ -31,7 +31,7 @@ def tree_scanner(worldslice, heightmap, origin):
                     print(f"ERROR reading block at {global_x}, {global_z}: {e}")
 
     if not tree_counter:
-        # Fallback if trees are not detected
+        # If trees are not detected:
         return "oak_log"
         
     
@@ -47,8 +47,8 @@ def get_palette(worldslice, heightmap,origin):
     return{
         "floor":random.choice(["cobblestone", f"{wood}_planks"]),
         "pillars": f"{wood}_{pillar_type}",
-        "walls": f"{wood}_planks",
-        "roof":random.choice([f"{wood}_stairs", "cobblestone_stairs"])
+        "walls": f"{wood}_{pillar_type}",
+        "roof":f"{wood}_stairs"
     }
         
 
