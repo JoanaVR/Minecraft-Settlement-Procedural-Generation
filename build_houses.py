@@ -37,12 +37,10 @@ def doorplacement(editor, x, y, z, depth, facing, palette):
     editor.placeBlock((door_pos[0], door_pos[1]+1, door_pos[2]), Block(f"{wood_type}_door", {"facing": facing, "half": "upper"}))
     stair_type =palette["roof"]
     editor.placeBlock((door_pos[0], door_pos[1]+2, door_pos[2]), Block(stair_type, {"facing": facing, "half": "top"}))
-    # Overwrite the perimeter wall below the door to be a floor block (sill)
     editor.placeBlock((door_pos[0], y, door_pos[2]), Block(palette["floor"]))
 
     ox, oz = outside_pos
     
-    # Clear space above the outside block and replace stairs logic with a flush dirt path
     for dy in range(1, 4):
         editor.placeBlock((ox, y+dy, oz), Block("air"))
     
@@ -96,7 +94,7 @@ def place_stairs(editor, x, y, z, depth, middle_y, floor_block, facing, palette)
  
     elif facing == "east":
         stair_z = z + 1
-        steps = min(depth - 2, stair_height)
+        steps = min(3, stair_height)
         for i in range(steps):
             sx = x + 1 + i
             editor.placeBlock((sx, y + i,     stair_z), floor_block)
@@ -108,7 +106,7 @@ def place_stairs(editor, x, y, z, depth, middle_y, floor_block, facing, palette)
  
     elif facing == "west":
         stair_z = z + 1
-        steps = min(depth - 2, stair_height)
+        steps = min(3, stair_height)
         for i in range(steps):
             sx = x + 3 - i
             editor.placeBlock((sx, y + i,     stair_z), floor_block)
@@ -240,7 +238,6 @@ def build_2fhouse(editor, x, y, z, depth, palette, facing):
     
     place_windows(editor, x, y, z, depth, facing)
     place_windows(editor, x, middle_y, z, depth, facing)
-
 
 def classify_house(depth, slope, near_road, near_water):
     """
