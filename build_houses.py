@@ -176,6 +176,114 @@ def add_pillars(editor, x, y, z, depth, height, pillar_block):
         for cz in (z, z+depth):
             placeCuboid(editor, (cx, y, cz), (cx, y+height, cz), Block(pillar_block))
 
+# Decoration Handlers
+
+def place_bed(editor, head_pos, facing_dir, color):
+    """Helper to place a 2-block bed safely in gdpc."""
+    foot_pos = head_pos
+    if facing_dir == "north": foot_pos = (head_pos[0], head_pos[1], head_pos[2]+1)
+    elif facing_dir == "south": foot_pos = (head_pos[0], head_pos[1], head_pos[2]-1)
+    elif facing_dir == "east": foot_pos = (head_pos[0]-1, head_pos[1], head_pos[2])
+    elif facing_dir == "west": foot_pos = (head_pos[0]+1, head_pos[1], head_pos[2])
+    
+    editor.placeBlock(foot_pos, Block(f"{color}_bed", {"facing": facing_dir, "part": "foot"}))
+    editor.placeBlock(head_pos, Block(f"{color}_bed", {"facing": facing_dir, "part": "head"}))
+
+def decorate_interior(editor, x, y, z, depth, facing, floors, palette):
+    """Adds randomized, context-aware interior detailing like beds, rugs, and workstations."""
+    bed_color = random.choice(["red", "blue", "yellow", "cyan", "white", "orange", "magenta"])
+    utils = ["crafting_table", "furnace", "barrel", "bookshelf", "cartography_table", "cauldron"]
+    random.shuffle(utils)
+
+    door_inside_pos = ()
+    if facing == "north": door_inside_pos = (x+2, y+1, z+1)
+    elif facing == "south": door_inside_pos = (x+2, y+1, z+depth-1)
+    elif facing == "east": door_inside_pos = (x+3, y+1, z+depth//2)
+    elif facing == "west": door_inside_pos = (x+1, y+1, z+depth//2)
+    
+
+    corners_1f = [(x+1, y+1, z+1), (x+3, y+1, z+1), (x+1, y+1, z+depth-1), (x+3, y+1, z+depth-1)]
+    stair_wall = opposite_facing(facing)
+    
+    available_corners_1f = [c for c in corners_1f if c != door_inside_pos]
+    
+    if floors == 2:
+        if stair_wall == "north":
+            available_corners_1f = [c for c in available_corners_1f if c[2] != z+1]
+        elif stair_wall == "south":
+            available_corners_1f = [c for c in available_corners_1f if c[2] != z+depth-1]
+        elif stair_wall == "east":
+            available_corners_1f = [c for c in available_corners_1f if c[0] != x+3]
+        elif stair_wall == "west":
+            available_corners_1f = [c for c in available_corners_1f if c[0] != x+1]
+
+
+    for i, c in enumerate(available_corners_1f):
+        if floors == 1 and i == len(available_corners_1f) - 1:
+            b_facing = "north" if c[2] <= z + depth//2 else "south"
+            place_bed(editor, c, b_facing, bed_color)
+        else:
+            if i < len(utils):
+                editor.placeBlock(c, Block(utils[i]))
+                if random.random() < 0.5:
+                    editor.placeBlock((c[0], c[1]+1, c[2]), Block("lantern"))
+
+    rug_color = random.choice(["light_gray", "gray", "brown", "red", "cyan"])
+    editor.placeBlock((x+2, y+1, z+depth//2), Block(f"{rug_color}_carpet"))
+
+
+    if floors == 2:
+        middle_y = y + 4
+        corners_2f = [(x+1, middle_y+1, z+1), (x+3, middle_y+1, z+1), (x+1, middle_y+1, z+depth-1), (x+3, middle_y+1, z+depth-1)]
+        
+        if facing in ["north", "south"]:
+            available_corners_2f = [c for c in corners_2f if c[0] != x+1]
+        else:
+            available_corners_2f = [c for c in corners_2f if c[2] != z+1]
+
+        if available_corners_2f:
+            bed_head = available_corners_2f[0]
+            b_facing = "north" if bed_head[2] <= z + depth//2 else "south"
+            place_bed(editor, bed_head, b_facing, bed_color)
+
+            # Extra decors for the bedroom
+            for c in available_corners_2f[1:]:
+                editor.placeBlock(c, Block(random.choice(["bookshelf", "chest", "loom"])))
+                if random.random() < 0.5:
+                    editor.placeBlock((c[0], c[1]+1, c[2]), Block("flower_pot"))
+        
+        editor.placeBlock((x+2, middle_y+1, z+depth//2), Block(f"{rug_color}_carpet"))
+
+def decorate_exterior(editor, x, y, z, depth, facing, palette):
+    """Adds small exterior details: door lanterns and lived-in props."""
+    
+    # Hang a lantern over the door frame
+    door_pos = ()
+    if facing == "north": door_pos = (x+2, y+3, z-1)
+    elif facing == "south": door_pos = (x+2, y+3, z+depth+1)
+    elif facing == "east": door_pos = (x+5, y+3, z+depth//2)
+    elif facing == "west": door_pos = (x-1, y+3, z+depth//2)
+    
+    if door_pos:
+        editor.placeBlock(door_pos, Block("lantern", {"hanging": "true"}))
+        
+    prop_x, prop_z = x - 1, z + 1
+    if facing in ["east", "west"]:
+        prop_x, prop_z = x + 1, z - 1
+        
+    if random.random() < 0.5:
+        # Wood chopping pile
+        log_type = palette["pillars"]
+        editor.placeBlock((prop_x, y+1, prop_z), Block(log_type, {"axis": "y"}))
+        editor.placeBlock((prop_x+1, y+1, prop_z), Block(log_type, {"axis": "x"}))
+        if random.random() < 0.5:
+            editor.placeBlock((prop_x, y+2, prop_z), Block("stonecutter", {"facing": "north"}))
+    else:
+        # Storage/utility
+        editor.placeBlock((prop_x, y+1, prop_z), Block("composter", {"level": "3"}))
+        editor.placeBlock((prop_x+1, y+1, prop_z), Block("barrel", {"facing": "up"}))
+
+
 #  Main Builders
 
 def build_1fhouse(editor, x, y, z, depth, height, palette, facing):
@@ -183,28 +291,29 @@ def build_1fhouse(editor, x, y, z, depth, height, palette, facing):
     floor = Block(palette["floor"])
     pillar = palette["pillars"]
 
-    # Clear space above the house so it's carved out of steep hillsides
     placeCuboid(editor, (x, y, z), (x+4, y+height+6, z+depth), Block("air"))
 
-    # Sink the entire structure by 1 block so the internal floor exactly matches the path outside
     y -= 1 
 
-    # Deep Foundation (15 blocks) to anchor perfectly onto any slope
     placeCuboid(editor, (x, y-15, z), (x+4, y-1, z+depth), Block("cobblestone"))
 
-    # Hollow wall shell
+
     placeCuboidHollow(editor, (x, y, z), (x+4, y+height, z+depth), wall)
     
-    # Fill in just the inner floor layer explicitly
     placeCuboid(editor, (x+1, y, z+1), (x+3, y, z+depth-1), floor) 
     
-    # Ensure interior is open
     placeCuboid(editor, (x+1, y+1, z+1), (x+3, y+height-1, z+depth-1), Block("air")) 
 
     add_pillars(editor, x, y, z, depth, height, pillar)
     roof_placement(editor, x, y, z, height, depth, palette, facing)
     doorplacement(editor, x, y, z, depth, facing, palette)
     place_windows(editor, x, y, z, depth, facing)
+    
+
+    decorate_interior(editor, x, y, z, depth, facing, 1, palette)
+    decorate_exterior(editor, x, y, z, depth, facing, palette)
+    
+    editor.runCommand(f"summon villager {x+2} {y+1} {z+depth//2}")
 
 def build_2fhouse(editor, x, y, z, depth, palette, facing):
     height = 8 # 2 floors
@@ -217,13 +326,12 @@ def build_2fhouse(editor, x, y, z, depth, palette, facing):
     floor = Block(palette["floor"])
     pillar = palette["pillars"]
 
-    # Deep cobblestone foundation for steep drops
     placeCuboid(editor, (x, y-15, z), (x+4, y-1, z+depth), Block("cobblestone"))
 
-    # Main structure shell
+
     placeCuboidHollow(editor, (x, y, z), (x+4, y+height, z+depth), wall)
     
-    # Interior floor
+
     placeCuboid(editor, (x+1, y, z+1), (x+3, y, z+depth-1), floor) 
     placeCuboid(editor, (x+1, y+1, z+1), (x+3, y+height-1, z+depth-1), Block("air")) 
 
@@ -238,6 +346,13 @@ def build_2fhouse(editor, x, y, z, depth, palette, facing):
     
     place_windows(editor, x, y, z, depth, facing)
     place_windows(editor, x, middle_y, z, depth, facing)
+
+
+    decorate_interior(editor, x, y, z, depth, facing, 2, palette)
+    decorate_exterior(editor, x, y, z, depth, facing, palette)
+
+    editor.runCommand(f"summon villager {x+2} {y+1} {z+depth//2}")
+
 
 def classify_house(depth, slope, near_road, near_water):
     """
@@ -264,12 +379,11 @@ def build_house(editor, x, y, z, depth, palette, facing,
 
 
 def build_farm(editor, x, y, z, width, depth, palette):
-    placeCuboid(editor, (x, y, z), (x+width-1, y+6, z+depth-1), Block("air"))
-    
-    y -= 1
+    """Builds a farm strictly raised 1 block off the foundational grass level."""
+    placeCuboid(editor, (x, y+1, z), (x+width-1, y+6, z+depth-1), Block("air"))
     
     placeCuboid(editor, (x, y-15, z), (x+width-1, y-1, z+depth-1), Block("dirt"))
-
+    
     log_block = palette["pillars"]
     for i in range(width):
         for j in range(depth):
@@ -291,3 +405,41 @@ def build_farm(editor, x, y, z, width, depth, palette):
             if j != water_z - z: 
                 crop = random.choice(crops)
                 editor.placeBlock((x+i, y+1, z+j), Block(crop))
+
+def build_animal_pen(editor, x, y, z, width=7, depth=7, palette=None):
+    """Builds a fenced animal pen and spawns livestock inside."""
+
+    placeCuboid(editor, (x, y, z), (x+width-1, y+5, z+depth-1), Block("air"))
+    
+    placeCuboid(editor, (x, y-15, z), (x+width-1, y-1, z+depth-1), Block("dirt"))
+    
+    if palette:
+        wood_type = palette["pillars"].replace("_log", "").replace("_stem", "")
+    else:
+        wood_type = "oak"
+        
+    fence_block = f"{wood_type}_fence"
+    gate_block = f"{wood_type}_fence_gate"
+    
+    for i in range(width):
+        for j in range(depth):
+            if i == 0 or i == width-1 or j == 0 or j == depth-1:
+                if i == width // 2 and j == 0:
+                    editor.placeBlock((x+i, y, z+j), Block(gate_block, {"facing": "north"}))
+                else:
+                    editor.placeBlock((x+i, y, z+j), Block(fence_block))
+            else:
+                editor.placeBlock((x+i, y-1, z+j), Block(random.choice(["dirt", "coarse_dirt", "podzol"])))
+                
+                if random.random() < 0.1:
+                    editor.placeBlock((x+i, y, z+j), Block("hay_block", {"axis": "y"}))
+                elif i == 1 and j == 1: 
+                    editor.placeBlock((x+i, y, z+j), Block("cauldron", {"level": "3"}))
+    
+    # Spawn animals inside the pen
+    animal_type = random.choice(["cow", "sheep", "pig", "chicken"])
+    num_animals = random.randint(3, 6)
+    for _ in range(num_animals):
+        ax = x + random.randint(1, width-2)
+        az = z + random.randint(1, depth-2)
+        editor.runCommand(f"summon {animal_type} {ax} {y} {az}")
