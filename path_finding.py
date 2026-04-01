@@ -273,9 +273,6 @@ def generate_layout(worldslice, heightmap, origin, num_houses, num_farms):
                 
     return houses, farms, road_tiles, center, exact_building_tiles
 
-
-
-
 def thicken_path_network(road_tiles, worldslice, heightmap, origin, exact_building_tiles):
     """Expands paths organically, respecting terrain slopes and building walls."""
     thick_roads = set()
@@ -386,6 +383,44 @@ def place_road(editor, heightmap, origin, road_tiles, worldslice, palette):
         else:
             editor.placeBlock((x, y-1, z), Block("dirt_path"))
 
+def add_street_lights(editor, road_tiles, heightmap, origin, worldslice, palette):
+    """Adds rustic street lighting posts randomly alongside roads."""
+    wood_type = palette["pillars"].replace("_log", "").replace("_stem", "")
+    fence_block = f"{wood_type}_fence"
+    
+    placed_lights = []
+    road_list = list(road_tiles)
+    random.shuffle(road_list) # randomize iteration
+    
+    for (rx, rz) in road_list:
+        if is_water_ws(worldslice, rx, rz, origin): continue
+        
+        too_close = False
+        for lx, lz in placed_lights:
+            if abs(lx - rx) + abs(lz - rz) < 12: # Check distance between lamps
+                too_close = True
+                break
+        
+        # 15% chance per eligible chunk of road to place a light
+        if not too_close and random.random() < 0.15:
+            y = get_height(heightmap, rx, rz, origin)
+            if y is None: continue
+            
+            # Check for space directly next to the path
+            sides = [(rx+1, rz), (rx-1, rz), (rx, rz+1), (rx, rz-1)]
+            random.shuffle(sides)
+            
+            for sx, sz in sides:
+                if (sx, sz) not in road_tiles and not is_water_ws(worldslice, sx, sz, origin):
+                    sy = get_height(heightmap, sx, sz, origin)
+                    # Needs reasonably flat ground to connect cleanly
+                    if sy is not None and abs(sy - y) <= 1:
+                        editor.placeBlock((sx, sy, sz), Block("mossy_cobblestone_wall"))
+                        editor.placeBlock((sx, sy+1, sz), Block(fence_block))
+                        editor.placeBlock((sx, sy+2, sz), Block(fence_block))
+                        editor.placeBlock((sx, sy+3, sz), Block("lantern"))
+                        placed_lights.append((sx, sz))
+                        break
 
 def generate_village(editor, buildArea, heightmap, worldslice, num_houses=10, num_farms=1):
     origin = (buildArea.offset.x, buildArea.offset.z)
@@ -412,6 +447,9 @@ def generate_village(editor, buildArea, heightmap, worldslice, num_houses=10, nu
 
     print("Weaving road network and bridges...")
     place_road(editor, heightmap, origin, road_tiles, worldslice, palette)
+
+    print("Adding street lights...")
+    add_street_lights(editor, road_tiles, heightmap, origin, worldslice, palette)
 
     print("Building central well...")
     cx, cz = center
