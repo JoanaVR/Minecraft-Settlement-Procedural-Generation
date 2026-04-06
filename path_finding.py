@@ -46,7 +46,7 @@ def slope_in_area(heightmap, origin, x, z, width=5, depth=5):
     return max(heights) - min(heights)
 
 # Increased max_slope to allow adaptable hill generation
-def is_valid_site(worldslice, heightmap, origin, x, z, width=5, depth=5, max_slope=15):
+def is_valid_site(worldslice, heightmap, origin, x, z, width=5, depth=5, max_slope=8):
     if not in_bounds(x, z, heightmap, origin) or not in_bounds(x + width, z + depth, heightmap, origin):
         return False
     if slope_in_area(heightmap, origin, x, z, width, depth) > max_slope: 
@@ -158,7 +158,7 @@ def generate_layout(worldslice, heightmap, origin, num_houses, num_farms):
     for _ in range(100):
         cx = ox + random.randint(sx // 4, 3 * sx // 4)
         cz = oz + random.randint(sz // 4, 3 * sz // 4)
-        if is_valid_site(worldslice, heightmap, origin, cx-3, cz-3, 7, 7, max_slope=15):
+        if is_valid_site(worldslice, heightmap, origin, cx-3, cz-3, 7, 7, max_slope=8):
             center = (cx, cz)
             break
             
@@ -236,7 +236,7 @@ def generate_layout(worldslice, heightmap, origin, num_houses, num_farms):
                         continue
                         
 
-                    if is_valid_site(worldslice, heightmap, origin, hx, hz, width, depth, max_slope=15):
+                    if is_valid_site(worldslice, heightmap, origin, hx, hz, width, depth, max_slope=8):
                         if not overlaps_any(hx, hz, placed_footprints, width, depth, padding=2):
                             
 

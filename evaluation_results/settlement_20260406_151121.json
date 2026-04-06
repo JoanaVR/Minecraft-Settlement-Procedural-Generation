@@ -1,0 +1,22 @@
+{
+  "timestamp": "2026-04-06T15:11:21.667826",
+  "location": {
+    "x": -5,
+    "z": 7
+  },
+  "settlement": {
+    "num_houses": 12,
+    "num_farms": 1,
+    "num_roads": 290,
+    "center": [
+      24,
+      37
+    ]
+  },
+  "metrics": {
+    "reachability_pct": 100.0,
+    "avg_height_delta": 1.5761194029850747,
+    "max_height_delta": 9.0,
+    "diversity_entropy": 0.982707830814421
+  }
+}
