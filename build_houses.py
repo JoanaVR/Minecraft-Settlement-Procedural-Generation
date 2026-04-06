@@ -4,6 +4,8 @@ from gdpc.geometry import placeCuboid, placeCuboidHollow
 
 #  House Placement Logic
 
+
+
 def get_door_outside_pos(x, z, depth, facing):
     """Returns the (x, z) coordinate immediately outside the door for pathfinding."""
     if facing == "north": return (x+2, z-1)
@@ -15,6 +17,16 @@ def get_door_outside_pos(x, z, depth, facing):
 def opposite_facing(facing):
     """Returns the opposite direction, useful for placing stairs facing outwards."""
     return {"north":"south", "south":"north", "east":"west", "west":"east"}.get(facing, "north")
+
+def block_diversity(editor, x, start_y, z, width, depth, block_palette=None):
+    if block_palette is None:
+        block_palette=["cobblestone","cobblestone","andesite","mossy_cobblestone","stone", "gravel"]
+
+    for dx in range(width):
+        for dz in range(depth):
+            for dy in range(start_y-15, start_y):
+                block_type = random.choice(block_palette)
+                editor.placeBlock((x+dx,dy,z+dz),Block(block_type))
 
 def doorplacement(editor, x, y, z, depth, facing, palette):
     """Places the door and ensures a clear, level step outside."""
@@ -295,7 +307,7 @@ def build_1fhouse(editor, x, y, z, depth, height, palette, facing):
 
     y -= 1 
 
-    placeCuboid(editor, (x, y-15, z), (x+4, y-1, z+depth), Block("cobblestone"))
+    block_diversity(editor,x,y,z,5,depth+1)
 
 
     placeCuboidHollow(editor, (x, y, z), (x+4, y+height, z+depth), wall)
@@ -326,7 +338,7 @@ def build_2fhouse(editor, x, y, z, depth, palette, facing):
     floor = Block(palette["floor"])
     pillar = palette["pillars"]
 
-    placeCuboid(editor, (x, y-15, z), (x+4, y-1, z+depth), Block("cobblestone"))
+    block_diversity(editor,x,y,z,5,depth+1)
 
 
     placeCuboidHollow(editor, (x, y, z), (x+4, y+height, z+depth), wall)
@@ -382,7 +394,8 @@ def build_farm(editor, x, y, z, width, depth, palette):
     """Builds a farm strictly raised 1 block off the foundational grass level."""
     placeCuboid(editor, (x, y+1, z), (x+width-1, y+6, z+depth-1), Block("air"))
     
-    placeCuboid(editor, (x, y-15, z), (x+width-1, y-1, z+depth-1), Block("dirt"))
+    farm_palette = ["dirt","dirt","mud","coarse_dirt","rooted_dirt"]
+    block_diversity(editor,x,y,z,width,depth,block_palette=farm_palette)
     
     log_block = palette["pillars"]
     for i in range(width):
