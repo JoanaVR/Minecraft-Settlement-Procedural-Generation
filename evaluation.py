@@ -58,7 +58,59 @@ class SettlementEvaluator:
         return mean_delta, max_delta, min_delta, len(buildings)
     
     
+    def analyze_block_distribution(self, palette):
+        """
+        Analyze blocks used in a single village based on palette.
+        Focuses ONLY on wood types (which vary by biome).
+        Ignores: air, dirt_path, lantern, cobblestone (constant across biomes).
+        
+        Args:
+            palette: Dict with keys 'walls', 'floor', 'pillars', 'roof'
+        
+        Returns:
+            dict with:
+                - wood_type: Extracted wood type name
+                - wood_blocks: List of all wood-based block types
+                - distribution: Counter of wood blocks only
+        """
+        wood_blocks = Counter()
+        
+        # Extract wood type from palette
+        wood_type = "unknown"
+        if "pillars" in palette:
+            pillar = palette["pillars"]
+            wood_type = pillar.replace("_log", "").replace("_stem", "").replace("_planks", "")
+        
+        # Only track wood-based blocks (what changes with biome)
+        wood_materials = {
+            "walls": palette.get("walls", "oak_log"),
+            "floor": palette.get("floor", "oak_planks"),
+            "pillars": palette.get("pillars", "oak_log"),
+            "roof": palette.get("roof", "oak_stairs"),
+        }
+        
+        # Weight: walls and pillars are heavy (many blocks)
+        for block_type, count in [("walls", 40), ("pillars", 30), ("floor", 20), ("roof", 10)]:
+            if block_type in wood_materials:
+                wood_blocks[wood_materials[block_type]] += count
+        
+        return {
+            "wood_type": wood_type,
+            "wood_blocks": list(wood_blocks.keys()),
+            "distribution": wood_blocks
+        }
+    
+    
     def structural_diversity(self, block_distributions):
+        """
+        Calculate Shannon Entropy of block type distributions across settlements.
+        
+        Args:
+            block_distributions: List of Counter dicts
+        
+        Returns:
+            tuple: (mean_entropy, max_entropy, min_entropy, num_settlements)
+        """
 
         if not block_distributions or len(block_distributions) == 0:
             return 0, 0, 0, 0
@@ -100,9 +152,9 @@ class SettlementEvaluator:
         report += "1. REACHABILITY SCORE\n"
         report += "-" * 70 + "\n"
         report += f"   Buildings Mutually Reachable: {reachability_pct:.1f}%\n"
-        report += "   ✓ EXCELLENT (>90%): Settlers can traverse the whole village\n"
-        report += "   ⚠ GOOD (70-90%): Most buildings connected, some isolated clusters\n"
-        report += "   ✗ POOR (<70%): Significant pathfinding issues\n\n"
+        report += "   EXCELLENT (>90%): Settlers can traverse the whole village\n"
+        report += "   GOOD (70-90%): Most buildings connected, some isolated clusters\n"
+        report += "   POOR (<70%): Significant pathfinding issues\n\n"
         
         # Topographic Compliance
         report += "2. TOPOGRAPHIC COMPLIANCE (Delta-Height in blocks)\n"
@@ -112,9 +164,9 @@ class SettlementEvaluator:
         report += f"   Maximum Height Difference: {max_delta:.2f} blocks\n"
         report += f"   Minimum Height Difference: {min_delta:.2f} blocks\n"
         report += f"   Buildings Analyzed: {num_buildings}\n"
-        report += "   ✓ EXCELLENT (<0.5): Perfect terrain adaptation\n"
-        report += "   ⚠ GOOD (0.5-2.0): Buildings sit naturally on terrain\n"
-        report += "   ✗ POOR (>2.0): Buildings floating/sinking into terrain\n\n"
+        report += "   EXCELLENT (<0.75): Perfect terrain adaptation\n"
+        report += "   GOOD (0.75-3.0): Buildings sit naturally on terrain\n"
+        report += "   POOR (≥3.0): Buildings floating/sinking into terrain\n\n"
         
         # Structural Diversity
         report += "3. STRUCTURAL DIVERSITY (Shannon Entropy)\n"
@@ -124,9 +176,9 @@ class SettlementEvaluator:
         report += f"   Max Entropy: {max_entropy:.2f} bits\n"
         report += f"   Min Entropy: {min_entropy:.2f} bits\n"
         report += f"   Settlements Analyzed: {num_settlements}\n"
-        report += "   ✓ HIGH (>4.0): Excellent material diversity\n"
-        report += "   ⚠ MEDIUM (2.0-4.0): Good variety, some patterns repeat\n"
-        report += "   ✗ LOW (<2.0): Mode collapse - same designs generated\n\n"
+        report += "   HIGH (>4.0): Excellent material diversity\n"
+        report += "   MEDIUM (2.0-4.0): Good variety, some patterns repeat\n"
+        report += "   LOW (<2.0): Mode collapse - same designs generated\n\n"
         
         report += "="*70 + "\n"
         
@@ -151,11 +203,7 @@ def evaluate_single_settlement(buildings, farms, road_tiles, center, exact_build
     # Topographic compliance
     topo = evaluator.topographic_compliance(all_buildings_full, heightmap, origin)
     
-    # Block distribution (from exact_building_tiles and road_tiles)
-    block_dist = Counter()
-    for _ in exact_building_tiles:
-        block_dist[palette.get("walls", "oak_log")] += 1
-    for _ in road_tiles:
-        block_dist["dirt_path"] += 1
+    # Block distribution based on palette
+    block_analysis = evaluator.analyze_block_distribution(palette)
     
-    return reachability, topo, block_dist
+    return reachability, topo, block_analysis

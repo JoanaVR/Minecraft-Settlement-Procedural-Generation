@@ -45,13 +45,17 @@ def main():
     mean_delta, max_delta, min_delta, _ = evaluator.topographic_compliance(all_buildings, heightmap, origin)
     print(" ✓")
     
+    print(f"  Analyzing block distribution...", end="", flush=True)
+    block_analysis = evaluator.analyze_block_distribution(palette)
+    print(" ✓")
+    
     block_dist = Counter()
     for _ in exact_building_tiles:
         block_dist[palette.get("walls", "oak_log")] += 1
     for _ in road_tiles:
         block_dist["dirt_path"] += 1
     
-    diversity_mean, diversity_max, diversity_min, _ = evaluator.structural_diversity([block_dist])
+    diversity_mean, diversity_max, diversity_min, _ = evaluator.structural_diversity([block_analysis["distribution"]])
     
     # Save evaluation results
     results = {
@@ -62,6 +66,11 @@ def main():
             "num_farms": len(farms),
             "num_roads": len(road_tiles),
             "center": center
+        },
+        "materials": {
+            "wood_type": block_analysis["wood_type"],
+            "wood_blocks": block_analysis["wood_blocks"],
+            "wood_distribution": {k: int(v) for k, v in block_analysis["distribution"].items()}
         },
         "metrics": {
             "reachability_pct": float(reachability),
