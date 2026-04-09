@@ -12,7 +12,7 @@ class SettlementEvaluator:
         if not buildings or len(buildings) < 2:
             return 100.0
         
-        # Extract building center positions (using door position as representative point)
+        # Extract building center positions
         building_positions = []
         for x, y, z, depth, facing in buildings:
             # Center of building footprint
@@ -20,14 +20,18 @@ class SettlementEvaluator:
             center_z = z + depth // 2
             building_positions.append((center_x, center_z))
         
-        # Fast check: how many buildings are within 20 blocks of a road?
-        reachable_buildings = 0
-        for bx, bz in building_positions:
-            # Check if this building is close to any road tile
-            for rx, rz in road_tiles:
-                if abs(bx - rx) <= 20 and abs(bz - rz) <= 20:
-                    reachable_buildings += 1
-                    break
+        # Choose the first building as the starting point
+        start_pos = building_positions[0]
+        
+        # Use A* to verify each building can be reached from the first building through the road network
+        reachable_buildings = 1  # Starting building is always reachable to itself
+        
+        for target_pos in building_positions[1:]:
+            # Run A* directly from start building to target building via roads
+            # Convert target building to a network set for astar_to_network
+            path = astar_to_network(start_pos, {target_pos}, heightmap, origin, worldslice)
+            if path:  # Non-empty path means target is reachable from start building
+                reachable_buildings += 1
         
         return (reachable_buildings / len(buildings) * 100) if buildings else 100.0
     
