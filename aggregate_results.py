@@ -82,10 +82,10 @@ def aggregate_results():
     print(f"  Min:        {np.min(heights):.2f} blocks")
     print(f"  Max:        {np.max(heights):.2f} blocks")
     
-    topo_excellent = sum(1 for h in heights if h < 0.75)
-    topo_good = sum(1 for h in heights if 0.75 <= h < 3.0)
+    topo_excellent = sum(1 for h in heights if h < 1)
+    topo_good = sum(1 for h in heights if 1 <= h < 3.0)
     topo_poor = sum(1 for h in heights if h >= 3.0)
-    print(f"  Grade: {topo_excellent} EXCELLENT (<0.75), {topo_good} GOOD (0.75-3.0), {topo_poor} POOR (≥3.0)")
+    print(f"  Grade: {topo_excellent} EXCELLENT (<1), {topo_good} GOOD (1-3.0), {topo_poor} POOR (≥3.0)")
     print()
     
     # Structural Diversity

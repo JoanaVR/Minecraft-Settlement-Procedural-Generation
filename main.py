@@ -38,8 +38,12 @@ def main():
         all_buildings.append((fx, fy, fz, 9, "north"))
     
     print(f"  Computing reachability ({len(all_buildings)} buildings)...", end="", flush=True)
-    reachability = evaluator.reachability_score(all_buildings, road_tiles, heightmap, origin, ws)
-    print(" ✓")
+    try:
+        reachability = evaluator.reachability_score(all_buildings, road_tiles, heightmap, origin, ws)
+        print(f" ✓ ({reachability:.1f}%)")
+    except Exception as e:
+        print(f" ERROR: {e}")
+        reachability = 0
     
     print(f"  Computing topographic compliance...", end="", flush=True)
     mean_delta, max_delta, min_delta, _ = evaluator.topographic_compliance(all_buildings, heightmap, origin)

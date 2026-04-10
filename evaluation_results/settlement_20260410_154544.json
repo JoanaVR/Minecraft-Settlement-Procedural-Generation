@@ -1,0 +1,35 @@
+{
+  "timestamp": "2026-04-10T15:45:44.528149",
+  "location": {
+    "x": 185,
+    "z": -264
+  },
+  "settlement": {
+    "num_houses": 12,
+    "num_farms": 2,
+    "num_roads": 308,
+    "center": [
+      208,
+      -220
+    ]
+  },
+  "materials": {
+    "wood_type": "oak",
+    "wood_blocks": [
+      "oak_log",
+      "oak_planks",
+      "oak_stairs"
+    ],
+    "wood_distribution": {
+      "oak_log": 70,
+      "oak_planks": 20,
+      "oak_stairs": 10
+    }
+  },
+  "metrics": {
+    "reachability_pct": 100.0,
+    "avg_height_delta": 0.6052631578947368,
+    "max_height_delta": 5.0,
+    "diversity_entropy": 1.1567796494470395
+  }
+}

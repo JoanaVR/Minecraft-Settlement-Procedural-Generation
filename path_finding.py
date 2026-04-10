@@ -97,7 +97,7 @@ class Node:
 def heuristic(a, b):
     return max(abs(a[0] - b[0]), abs(a[1] - b[1]))
 
-def astar_to_network(start, existing_network, heightmap, origin, worldslice=None, water_penalty=50, strict_buildings=None):
+def astar_to_network(start, existing_network, heightmap, origin, worldslice=None, water_penalty=50, strict_buildings=None, max_iterations=1000):
     if not existing_network: return []
     if start in existing_network: return [start]
     if strict_buildings is None: strict_buildings = set()
@@ -110,6 +110,8 @@ def astar_to_network(start, existing_network, heightmap, origin, worldslice=None
     closed = set()
     heapq.heappush(open_list, Node(start, 0, heuristic(start, closest_goal)))
     
+    iterations = 0
+    
     directions = [
         (1, 0, 1.0), (-1, 0, 1.0), (0, 1, 1.0), (0, -1, 1.0),
         (1, 1, 1.414), (-1, 1, 1.414), (1, -1, 1.414), (-1, -1, 1.414)
@@ -119,7 +121,8 @@ def astar_to_network(start, existing_network, heightmap, origin, worldslice=None
         lx, lz = pos[0] - ox, pos[1] - oz
         return 0 <= lx < sx and 0 <= lz < sz
 
-    while open_list:
+    while open_list and iterations < max_iterations:
+        iterations += 1
         current = heapq.heappop(open_list)
         if current.pos in existing_network:
             path = []

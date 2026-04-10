@@ -1,0 +1,35 @@
+{
+  "timestamp": "2026-04-10T19:07:03.476555",
+  "location": {
+    "x": -3829,
+    "z": -1294
+  },
+  "settlement": {
+    "num_houses": 5,
+    "num_farms": 0,
+    "num_roads": 140,
+    "center": [
+      -3800,
+      -1273
+    ]
+  },
+  "materials": {
+    "wood_type": "spruce",
+    "wood_blocks": [
+      "spruce_log",
+      "cobblestone",
+      "spruce_stairs"
+    ],
+    "wood_distribution": {
+      "spruce_log": 70,
+      "cobblestone": 20,
+      "spruce_stairs": 10
+    }
+  },
+  "metrics": {
+    "reachability_pct": 100.0,
+    "avg_height_delta": 0.3769230769230769,
+    "max_height_delta": 8.0,
+    "diversity_entropy": 1.1567796494470395
+  }
+}

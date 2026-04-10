@@ -1,0 +1,35 @@
+{
+  "timestamp": "2026-04-10T16:12:19.252194",
+  "location": {
+    "x": 147,
+    "z": -2292
+  },
+  "settlement": {
+    "num_houses": 12,
+    "num_farms": 2,
+    "num_roads": 288,
+    "center": [
+      178,
+      -2249
+    ]
+  },
+  "materials": {
+    "wood_type": "acacia",
+    "wood_blocks": [
+      "acacia_log",
+      "acacia_planks",
+      "acacia_stairs"
+    ],
+    "wood_distribution": {
+      "acacia_log": 70,
+      "acacia_planks": 20,
+      "acacia_stairs": 10
+    }
+  },
+  "metrics": {
+    "reachability_pct": 100.0,
+    "avg_height_delta": 0.4675,
+    "max_height_delta": 8.0,
+    "diversity_entropy": 1.1567796494470395
+  }
+}

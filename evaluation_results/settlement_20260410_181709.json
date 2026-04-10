@@ -1,0 +1,35 @@
+{
+  "timestamp": "2026-04-10T18:17:09.414426",
+  "location": {
+    "x": 14,
+    "z": -71
+  },
+  "settlement": {
+    "num_houses": 7,
+    "num_farms": 0,
+    "num_roads": 209,
+    "center": [
+      44,
+      -52
+    ]
+  },
+  "materials": {
+    "wood_type": "birch",
+    "wood_blocks": [
+      "birch_log",
+      "cobblestone",
+      "birch_stairs"
+    ],
+    "wood_distribution": {
+      "birch_log": 70,
+      "cobblestone": 20,
+      "birch_stairs": 10
+    }
+  },
+  "metrics": {
+    "reachability_pct": 100.0,
+    "avg_height_delta": 1.1722222222222223,
+    "max_height_delta": 7.0,
+    "diversity_entropy": 1.1567796494470395
+  }
+}

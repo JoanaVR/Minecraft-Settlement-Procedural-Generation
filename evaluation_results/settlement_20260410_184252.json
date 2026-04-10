@@ -1,0 +1,35 @@
+{
+  "timestamp": "2026-04-10T18:42:52.893361",
+  "location": {
+    "x": 112,
+    "z": 418
+  },
+  "settlement": {
+    "num_houses": 12,
+    "num_farms": 1,
+    "num_roads": 322,
+    "center": [
+      136,
+      459
+    ]
+  },
+  "materials": {
+    "wood_type": "jungle",
+    "wood_blocks": [
+      "jungle_log",
+      "jungle_planks",
+      "jungle_stairs"
+    ],
+    "wood_distribution": {
+      "jungle_log": 70,
+      "jungle_planks": 20,
+      "jungle_stairs": 10
+    }
+  },
+  "metrics": {
+    "reachability_pct": 100.0,
+    "avg_height_delta": 0.9154929577464789,
+    "max_height_delta": 7.0,
+    "diversity_entropy": 1.1567796494470395
+  }
+}

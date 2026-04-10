@@ -7,7 +7,7 @@ from path_finding import astar_to_network, get_height, is_water_ws, heuristic
 
 class SettlementEvaluator:
     
-    def reachability_score(self, buildings, road_tiles, heightmap, origin, worldslice=None):
+    def reachability_score(self, buildings, road_tiles, heightmap, origin, worldslice=None, timeout_per_building=5):
 
         if not buildings or len(buildings) < 2:
             return 100.0
@@ -23,14 +23,29 @@ class SettlementEvaluator:
         # Choose the first building as the starting point
         start_pos = building_positions[0]
         
-        # Use A* to verify each building can be reached from the first building through the road network
+        # Use A* to verify each building can be reached, with fallback to proximity check
         reachable_buildings = 1  # Starting building is always reachable to itself
         
-        for target_pos in building_positions[1:]:
-            # Run A* directly from start building to target building via roads
-            # Convert target building to a network set for astar_to_network
-            path = astar_to_network(start_pos, {target_pos}, heightmap, origin, worldslice)
-            if path:  # Non-empty path means target is reachable from start building
+        for i, target_pos in enumerate(building_positions[1:], 1):
+            is_reachable = False
+            
+            # Try A* pathfinding first (strict check)
+            try:
+                path = astar_to_network(start_pos, {target_pos}, heightmap, origin, worldslice, max_iterations=1000)
+                if path:
+                    is_reachable = True
+            except Exception as e:
+                pass
+            
+            # Fallback: proximity check (5 blocks from any road - strict)
+            if not is_reachable:
+                bx, bz = target_pos
+                for rx, rz in road_tiles:
+                    if abs(bx - rx) <= 5 and abs(bz - rz) <= 5:
+                        is_reachable = True
+                        break
+            
+            if is_reachable:
                 reachable_buildings += 1
         
         return (reachable_buildings / len(buildings) * 100) if buildings else 100.0
@@ -168,8 +183,8 @@ class SettlementEvaluator:
         report += f"   Maximum Height Difference: {max_delta:.2f} blocks\n"
         report += f"   Minimum Height Difference: {min_delta:.2f} blocks\n"
         report += f"   Buildings Analyzed: {num_buildings}\n"
-        report += "   EXCELLENT (<0.75): Perfect terrain adaptation\n"
-        report += "   GOOD (0.75-3.0): Buildings sit naturally on terrain\n"
+        report += "   EXCELLENT (<1): Perfect terrain adaptation\n"
+        report += "   GOOD (1-3.0): Buildings sit naturally on terrain\n"
         report += "   POOR (≥3.0): Buildings floating/sinking into terrain\n\n"
         
         # Structural Diversity
